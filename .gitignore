@@ -1,0 +1,39 @@
+# --- Secrets and local config ---
+# config.yaml stays committed: it holds defaults only (CI loads it); SHEET_URL, SHEET_TOKEN and
+# vendor keys come from env / GitHub secrets.
+.env
+.env.*
+!.env.example
+*.secret
+*.secrets
+*.pem
+*.key
+credentials*.json
+service-account*.json
+client_secret*.json
+token*.json
+.clasprc.json
+
+# Claude Code: personal settings (shared settings and skills stay committed)
+.claude/settings.local.json
+
+# --- Fetcher output ---
+places-fetcher/outlets*.csv
+places-fetcher/*.raw.json
+
+# --- Go ---
+places-fetcher/places-fetcher
+places-fetcher/app/app
+*.exe
+*.test
+*.out
+coverage.*
+
+# --- Editors / OS ---
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+.idea/
+*.swp
+.DS_Store
+Thumbs.db

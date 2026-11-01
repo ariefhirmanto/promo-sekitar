@@ -1,0 +1,25 @@
+name: places_refresh
+
+on:
+  schedule:
+    - cron: "0 20 1,15 * *"   # 20:00 UTC = 03:00 WIB on the 2nd and 16th
+  workflow_dispatch:
+
+jobs:
+  places:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: places-fetcher
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+      - run: go mod tidy
+      - run: go test ./...
+      - run: go run ./app
+        env:
+          SHEET_URL: ${{ secrets.SHEET_URL }}
+          SHEET_TOKEN: ${{ secrets.SHEET_TOKEN }}
