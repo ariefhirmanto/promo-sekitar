@@ -39,7 +39,10 @@ fetcher writes.
   or a `NEXT_PUBLIC_` var) and `WRITE_TOKEN` for fetchers (`SHEET_TOKEN`). A new endpoint picks
   one with `authorized_(p, '<PROPERTY>')`; anything that changes the sheet takes `WRITE_TOKEN`.
 - The spreadsheet stays shared as Restricted; the web app runs as its owner.
-- After changing `apps-script/Code.gs`, remind the user to paste it into Apps Script and deploy a
-  new version (Deploy → Manage deployments → edit → New version).
+- After changing `apps-script/Code.gs`, run `node --test 'apps-script/test/*.test.mjs'` (Node 22 in
+  WSL), then remind the user to paste it into Apps Script and deploy a new version
+  (Deploy → Manage deployments → edit → New version).
+- Promo fetcher work follows the RFC milestone by milestone on `promo-fetcher`: one commit and one
+  `promo-m<N>` tag each, with a `CHANGELOG.md` entry that says how to deploy and roll it back.
 - Match the existing style: log lines like `[Outlet][Method][Layer]`, errors wrapped with
   `github.com/pkg/errors` (`errors.WithMessage(err, "outletUC.Method.Step")`).
