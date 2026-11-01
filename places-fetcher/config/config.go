@@ -13,6 +13,7 @@ type MainConfig struct {
 	Overpass OverpassConfig
 	Sheet    SheetConfig
 	Outlet   OutletConfig
+	Promo    PromoConfig
 }
 
 type PlacesConfig struct {
@@ -36,6 +37,13 @@ type SheetConfig struct {
 
 type OutletConfig struct {
 	MergeRadiusM float64 `mapstructure:"MergeRadiusM"`
+}
+
+// Settings of the promo job (go run ./app/promos); each source adapter reads its own section.
+type PromoConfig struct {
+	UserAgent           string `mapstructure:"UserAgent"`
+	FetchTimeoutSeconds int    `mapstructure:"FetchTimeoutSeconds"` // per source, all its pages
+	MaxErrors           int    `mapstructure:"MaxErrors"`           // failed runs in a row before status error
 }
 
 // LoadConfig reads config.yaml; any key can be overridden by env, e.g. Sheet.Token → SHEET_TOKEN.

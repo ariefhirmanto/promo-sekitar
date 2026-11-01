@@ -10,6 +10,7 @@ branch: one commit and one tag per milestone, so any milestone can be rolled bac
 |---|---|
 | `promo-base` | `main` before any promo fetcher work |
 | `promo-m1` | M1: sheet tabs and Code.gs endpoints |
+| `promo-m2` | M2: promo job skeleton in Go (no source types yet) |
 
 A change can live in three places; roll back each one the change touched.
 
@@ -24,6 +25,41 @@ A change can live in three places; roll back each one the change touched.
   Only delete them if you want them gone, and never rename existing tabs or headers.
 
 ## Unreleased
+
+### Promo fetcher M2: promo job skeleton (tag `promo-m2`)
+
+Added
+- `go run ./app/promos`, a second job in the `places-fetcher` module: reads `sources`, fetches
+  every due source through the adapter for its `type`, upserts what it read into `raw_items`, and
+  writes each source's status back. Flags: `-dry-run`, `-source <id>`, `-items-file` (replay saved
+  raw items), `-sources-file` (sources from JSON), `-csv`.
+- `promo/` domain with the ports from the RFC, the source-type registry (`promo/source`,
+  `Register` / `NewSet` / `Names`), a replay adapter, the sheet repository for all five M1
+  endpoints, and dry-run repositories (sources JSON, raw items CSV, status log).
+- `sheet/`: the Apps Script HTTP client, now shared by both jobs.
+- `Promo:` section in `config.yaml`: `UserAgent`, `FetchTimeoutSeconds` (120), `MaxErrors` (3).
+- Fixtures `testdata/sources.json` and `testdata/promo_items_2026-11-01.json`; 26 new Go tests.
+
+Behaviour
+- Due: `active` and `fetch_every_hours` passed since `last_fetched_at`, less 10% (at most 2 h).
+  `-source` runs one source whatever its status or due time.
+- A failure adds 1 to `error_count` and sets `last_error`; the 3rd in a row moves an active
+  source to `error`. A success sets `last_fetched_at` and clears both. One failing source never
+  stops the others; the run fails only on a sheet read/write error or when every due source failed.
+- Raw items are written before statuses, so a failed write leaves `last_fetched_at` old and the
+  next run fetches again. The fetch stage never sends a raw item `status`: Code.gs marks new rows
+  `new` and leaves seen rows as they are.
+- No source types are registered yet (M3), so a live run marks every source
+  `unknown source type`. Don't schedule it before M3; use the dry runs in `places-fetcher/README.md`.
+
+Changed
+- `outlet/repository` uses the shared `sheet` client. Same modes, payloads and results; the
+  not-configured message reads `SHEET_URL and SHEET_TOKEN must be set (or use -dry-run with
+  -brands-file)`. The places dry run on the saved Overpass response still gives 68 outlets.
+
+Deploy: nothing. No Code.gs change, no workflow change.
+
+Roll back: `git revert promo-m2`. Nothing to undo in Apps Script or the sheet.
 
 ### Promo fetcher M1: sheet tabs and Code.gs endpoints (tag `promo-m1`)
 

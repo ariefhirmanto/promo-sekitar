@@ -21,7 +21,16 @@ outlet/                  domain interfaces + input
   usecase/               brand matching, format, mall lookup, 50 m merge (vendor-agnostic)
   controller/            CLI controller: runs the usecase, logs the summary
   geo/                   H3 (uber/h3-go, cgo) behind GeoIndexer
-testdata/                real Overpass response (1 Nov 2026) + brands.json
+app/promos/main.go       promo job: flags → job.PromoOptions, loads config, runs it
+job/promos.go            wires the promo job (sheet or files, source registry or replay)
+sheet/                   Apps Script client shared by both jobs (token + mode, {ok, error} envelope)
+promo/                   promo domain: ports (SourceReader, SourceStatusWriter, RawItemWriter/Reader,
+                         PromoRepository, SourceAdapter, SourceAdapters) + InputRun
+  source/                registry of source types (Register / NewSet / Names); replay/ for -items-file
+  repository/            sheet (sources, raw_items, promos), sources JSON, raw items CSV, dry-run log
+  usecase/               due sources, fetch with per-source timeout, status write-back
+  controller/            CLI controller: runs the usecase, logs per source
+testdata/                real Overpass response (1 Nov 2026) + brands.json; sources.json + promo items
 ```
 
 ```
@@ -87,3 +96,24 @@ Rows with another `source` (e.g. `manual`) are never touched, so hand-added outl
 - Public Overpass servers are often busy; the fetcher tries 3 servers × 3 rounds and aborts
   without writing if all fail, the query times out, or nothing matches, so outlets are never
   wrongly closed.
+
+## Promo job
+
+Built milestone by milestone from the promo fetcher RFC (see `../CHANGELOG.md`). As of M2 it
+reads the `sources` tab, fetches every due source through its type's adapter, stores what it read
+in `raw_items`, and writes each source's status back. Source type adapters arrive in M3 and
+parsing into `promos` in M4, so today a live run marks every source `unknown source type`; use the
+dry runs below.
+
+```bash
+go run ./app/promos -dry-run -sources-file testdata/sources.json -items-file testdata/promo_items_2026-11-01.json
+go run ./app/promos -dry-run -source src_ramenya_katalog     # one source from the sheet, due or not
+```
+
+- A source is due when it's `active` and `fetch_every_hours` has passed since `last_fetched_at`,
+  less 10% of the interval (at most 2 h) so a run that starts a little early still picks it up.
+- `-source` runs that one source whatever its status; a paused source never moves to `error`.
+- A failed fetch adds 1 to `error_count` and sets `last_error`; the 3rd failure in a row
+  (`Promo.MaxErrors`) moves an active source to `error`. A success clears both.
+- The run fails only when the sheet can't be read or written, or every due source failed.
+- `-dry-run` logs the status writes and writes the raw items to `raw_items.csv`.

@@ -21,3 +21,9 @@ Sheet:
 
 Outlet:
   MergeRadiusM: 50
+
+# Promo job (go run ./app/promos); the sources tab says what to read.
+Promo:
+  UserAgent: "makandimana-promo-fetcher/0.1"
+  FetchTimeoutSeconds: 120
+  MaxErrors: 3
