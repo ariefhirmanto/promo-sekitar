@@ -15,6 +15,8 @@ fetcher writes.
 
 - Adding or fixing a brand: use the `add-brand` skill.
 - Adding or switching a places API: use the `add-places-provider` skill.
+- Go layering and adapter contracts: `.claude/rules/clean-architecture.md` and
+  `.claude/rules/adapters.md` (they load automatically for files under `places-fetcher/`).
 
 ## Rules
 
@@ -28,6 +30,10 @@ fetcher writes.
 - Never change sheet tab names, header names, or existing ids (`brand_*`, `out_*`): Code.gs and
   promos depend on them. New columns are fine; Code.gs reads by header name.
 - Rows with `source = manual` belong to the user; code must never update or close them.
+- `promos.source` is `web` for anything taken from a web page (bank promo pages, aggregators like
+  katalogpromosi.com), whether pasted by hand or written by a promo fetcher; `action_url` keeps
+  the page. A Go promo feeder writes `web` and, like the outlets upsert, only touches `web` rows.
+  `outlets.source` stays the data owner (`osm`): it is part of the outlet ids.
 - Secrets (`SHEET_URL`, `SHEET_TOKEN`, vendor keys) come from env / GitHub secrets, never files.
 - Two Apps Script tokens: `READ_TOKEN` for feed reads (Next.js server only, never in browser code
   or a `NEXT_PUBLIC_` var) and `WRITE_TOKEN` for fetchers (`SHEET_TOKEN`). A new endpoint picks
