@@ -10,6 +10,7 @@ by distance: a swipe deck ("Mau makan apa?") and a nearby list.
 
 | Folder | What it is |
 |---|---|
+| [`web/`](web/) | Next.js app: the swipe deck. Calls Apps Script from its server with `READ_TOKEN`; the browser holds no secrets. |
 | [`places-fetcher/`](places-fetcher/) | Go job that fills the `outlets` tab from OpenStreetMap: brand matching, mall lookup, H3 cells. Vendor adapters make the data source swappable. |
 | [`apps-script/`](apps-script/) | Google Apps Script on the spreadsheet: serves the feed as JSON and accepts fetcher writes. |
 | [`.github/workflows/`](.github/workflows/) | Scheduled places refresh (2nd and 16th, 03:00 WIB). |

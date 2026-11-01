@@ -8,6 +8,8 @@ fetcher writes.
   (models → domain interfaces → repository / usecase / controller, wired in `job/app.go`).
   Places vendors are adapters under `outlet/provider/<vendor>`.
 - `.github/workflows/places_refresh.yml`: runs the fetcher on the 2nd and 16th, 03:00 WIB.
+- `web/`: Next.js 16 app (App Router, Cache Components). Read `web/AGENTS.md` and the docs in
+  `web/node_modules/next/dist/docs/` before changing it: APIs differ from older Next.js.
 
 ## Workflows
 
@@ -18,6 +20,10 @@ fetcher writes.
 
 - Run Go commands in WSL from `~/promo/places-fetcher` (Go 1.22 + gcc live there, not on Windows).
   Before finishing a change: `gofmt -l .`, `go vet ./...`, `go test ./...`.
+- `web/`: Node 22 from nvm in WSL (`. ~/.nvm/nvm.sh` first in non-interactive shells). Before
+  finishing: `npm test`, `npx eslint .`, `npx tsc --noEmit`, `npx next build`. The browser only
+  calls `/api/feed`; anything that touches `READ_TOKEN` or `APPS_SCRIPT_URL` lives in a file that
+  imports `server-only`. Use `FEED_MOCK=1` for UI work without the sheet.
 - `-dry-run` for every fetcher run; a run without it writes the live sheet, so only on request.
 - Never change sheet tab names, header names, or existing ids (`brand_*`, `out_*`): Code.gs and
   promos depend on them. New columns are fine; Code.gs reads by header name.
