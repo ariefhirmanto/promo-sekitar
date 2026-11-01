@@ -87,21 +87,29 @@ func (m *memRaw) UpsertRawItems(ctx context.Context, items []models.RawItem) (mo
 type fakeAdapter struct {
 	results map[string]models.FetchResult
 	errs    map[string]error
+	got     map[string]models.FetchRequest // what each source was asked with
 }
 
 func (f fakeAdapter) Type() string { return "web_page" }
-func (f fakeAdapter) FetchItems(ctx context.Context, src models.Source) (models.FetchResult, error) {
-	return f.results[src.ID], f.errs[src.ID]
+func (f fakeAdapter) FetchItems(ctx context.Context, req models.FetchRequest) (models.FetchResult, error) {
+	if f.got != nil {
+		f.got[req.Source.ID] = req
+	}
+	return f.results[req.Source.ID], f.errs[req.Source.ID]
 }
 
 type adapters map[string]promo.SourceAdapter
 
 func (a adapters) ForType(t string) (promo.SourceAdapter, bool) { s, ok := a[t]; return s, ok }
 
+type memRefs map[string][]string
+
+func (m memRefs) GetRawItemRefs(ctx context.Context) (map[string][]string, error) { return m, nil }
+
 func run(t *testing.T, srcs memSources, a fakeAdapter, sourceID string) (models.PromoRunResult, error, *memStatuses, *memRaw) {
 	t.Helper()
 	st, raw := &memStatuses{}, &memRaw{}
-	uc := NewPromoUsecase(srcs, st, adapters{"web_page": a}, raw, 3, time.Minute)
+	uc := NewPromoUsecase(srcs, st, adapters{"web_page": a}, raw, memRefs{}, 3, time.Minute)
 	res, err := uc.RunSources(context.Background(), promo.InputRun{SourceID: sourceID, Now: now})
 	return res, err, st, raw
 }
@@ -201,13 +209,34 @@ func TestRunSourcesSheetWriteFailureLeavesStatusesAlone(t *testing.T) {
 	srcs := memSources{{ID: "src_a", Type: "web_page", Status: "active"}}
 	a := fakeAdapter{results: map[string]models.FetchResult{"src_a": {Items: []models.RawItem{{Ref: "1"}}}}}
 	st, raw := &memStatuses{}, &memRaw{err: errors.New("sheet: busy, retry later")}
-	uc := NewPromoUsecase(srcs, st, adapters{"web_page": a}, raw, 3, time.Minute)
+	uc := NewPromoUsecase(srcs, st, adapters{"web_page": a}, raw, memRefs{}, 3, time.Minute)
 	_, err := uc.RunSources(context.Background(), promo.InputRun{Now: now})
 	if err == nil || !strings.Contains(err.Error(), "UpsertRawItems") {
 		t.Fatalf("want the raw items error, got %v", err)
 	}
 	if st.got != nil {
 		t.Fatal("statuses must not advance when raw items weren't stored")
+	}
+}
+
+func TestRunSourcesPassesAndEnforcesKnownRefs(t *testing.T) {
+	srcs := memSources{{ID: "src_a", Type: "web_page", Status: "active"}}
+	a := fakeAdapter{
+		// this adapter ignores KnownRefs and returns the stored ref anyway
+		results: map[string]models.FetchResult{"src_a": {Items: []models.RawItem{{Ref: "old"}, {Ref: "new"}}}},
+		got:     map[string]models.FetchRequest{},
+	}
+	st, raw := &memStatuses{}, &memRaw{}
+	uc := NewPromoUsecase(srcs, st, adapters{"web_page": a}, raw, memRefs{"src_a": {"old"}, "src_b": {"x"}}, 3, time.Minute)
+	res, err := uc.RunSources(context.Background(), promo.InputRun{Now: now})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if req := a.got["src_a"]; !req.KnownRefs["old"] || req.KnownRefs["x"] {
+		t.Fatalf("the adapter gets only its own source's refs: %+v", req.KnownRefs)
+	}
+	if len(raw.got) != 1 || raw.got[0].Ref != "new" || res.Sources[0].Items != 1 {
+		t.Fatalf("a stored ref is never sent again: %+v", raw.got)
 	}
 }
 
@@ -220,7 +249,7 @@ func TestRunSourcesNothingDue(t *testing.T) {
 }
 
 func TestRunSourcesValidatesInput(t *testing.T) {
-	uc := NewPromoUsecase(memSources{}, &memStatuses{}, adapters{}, &memRaw{}, 3, time.Minute)
+	uc := NewPromoUsecase(memSources{}, &memStatuses{}, adapters{}, &memRaw{}, memRefs{}, 3, time.Minute)
 	if _, err := uc.RunSources(context.Background(), promo.InputRun{}); err == nil {
 		t.Fatal("a zero clock must be rejected")
 	}

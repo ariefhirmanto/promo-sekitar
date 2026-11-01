@@ -35,6 +35,9 @@ fetcher writes.
   the page. A Go promo feeder writes `web` and, like the outlets upsert, only touches `web` rows.
   `outlets.source` stays the data owner (`osm`): it is part of the outlet ids.
 - Secrets (`SHEET_URL`, `SHEET_TOKEN`, vendor keys) come from env / GitHub secrets, never files.
+- Never commit copies of third-party pages (HTML, JSON, text, or summaries of them) as testdata;
+  test pages are hand-written HTML in `testdata/webpage/` with an invented brand, and live captures stay in gitignored
+  `places-fetcher/testdata/live/`. Details: rule 12 in `.claude/rules/adapters.md`.
 - Two Apps Script tokens: `READ_TOKEN` for feed reads (Next.js server only, never in browser code
   or a `NEXT_PUBLIC_` var) and `WRITE_TOKEN` for fetchers (`SHEET_TOKEN`). A new endpoint picks
   one with `authorized_(p, '<PROPERTY>')`; anything that changes the sheet takes `WRITE_TOKEN`.

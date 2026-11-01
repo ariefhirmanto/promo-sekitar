@@ -13,7 +13,9 @@ import (
 	"places-fetcher/promo/source"
 	"places-fetcher/promo/source/replay"
 	promoUsecase "places-fetcher/promo/usecase"
-	// Source type adapters register themselves; add new ones here (M3: webpage).
+
+	// Source type adapters register themselves; add new ones here.
+	_ "places-fetcher/promo/source/webpage"
 )
 
 // PromoOptions come from the command line of app/promos; they pick the repositories and adapters.
@@ -43,8 +45,10 @@ func (j *PromoJob) Run() error {
 	sheetRepo := promoRepository.NewSheetRepository(j.cfg.Sheet)
 
 	var sources promo.SourceReader = sheetRepo
+	var knownRefs promo.RawItemRefReader = sheetRepo
 	if j.opts.SourcesFile != "" {
 		sources = promoRepository.NewSourceFileRepository(j.opts.SourcesFile)
+		knownRefs = promoRepository.NewNoRefs()
 	}
 
 	var adapters promo.SourceAdapters
@@ -69,7 +73,7 @@ func (j *PromoJob) Run() error {
 		rawItems = promoRepository.NewRawItemCSVRepository(j.opts.RawCSVPath)
 	}
 
-	promoUC := promoUsecase.NewPromoUsecase(sources, statuses, adapters, rawItems,
+	promoUC := promoUsecase.NewPromoUsecase(sources, statuses, adapters, rawItems, knownRefs,
 		j.cfg.Promo.MaxErrors, time.Duration(j.cfg.Promo.FetchTimeoutSeconds)*time.Second)
 	handler := promoController.NewPromoController(promoUC)
 

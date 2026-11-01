@@ -13,7 +13,7 @@ import (
 type stub struct{ name string }
 
 func (s stub) Type() string { return s.name }
-func (s stub) FetchItems(ctx context.Context, src models.Source) (models.FetchResult, error) {
+func (s stub) FetchItems(ctx context.Context, req models.FetchRequest) (models.FetchResult, error) {
 	return models.FetchResult{}, nil
 }
 

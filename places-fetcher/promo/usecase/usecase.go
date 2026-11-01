@@ -20,13 +20,14 @@ type usecase struct {
 	statuses     promo.SourceStatusWriter
 	adapters     promo.SourceAdapters
 	rawItems     promo.RawItemWriter
+	knownRefs    promo.RawItemRefReader
 	maxErrors    int
 	fetchTimeout time.Duration
 }
 
 // Promo Usecase constructor; adapters is the source-type registry, or a replay file.
 func NewPromoUsecase(sources promo.SourceReader, statuses promo.SourceStatusWriter, adapters promo.SourceAdapters,
-	rawItems promo.RawItemWriter, maxErrors int, fetchTimeout time.Duration) *usecase {
+	rawItems promo.RawItemWriter, knownRefs promo.RawItemRefReader, maxErrors int, fetchTimeout time.Duration) *usecase {
 	if maxErrors <= 0 {
 		maxErrors = 3
 	}
@@ -34,7 +35,7 @@ func NewPromoUsecase(sources promo.SourceReader, statuses promo.SourceStatusWrit
 		fetchTimeout = 2 * time.Minute
 	}
 	return &usecase{sources: sources, statuses: statuses, adapters: adapters, rawItems: rawItems,
-		maxErrors: maxErrors, fetchTimeout: fetchTimeout}
+		knownRefs: knownRefs, maxErrors: maxErrors, fetchTimeout: fetchTimeout}
 }
 
 // RunSources fetches every due source, stores what it read as raw items, and writes each source's
@@ -62,11 +63,17 @@ func (u *usecase) RunSources(ctx context.Context, input promo.InputRun) (resp mo
 		return resp, nil
 	}
 
+	refs, err := u.knownRefs.GetRawItemRefs(ctx)
+	if err != nil {
+		log.Println("[Promo][RunSources][Usecase] Problem getting known refs, err: ", err.Error())
+		return resp, errors.WithMessage(err, "promoUC.RunSources.GetRawItemRefs")
+	}
+
 	now := input.Now.In(models.WIB).Format(models.TimeLayout)
 	var items []models.RawItem
 	var statuses []models.SourceStatus
 	for _, src := range due {
-		got, ferr := u.fetch(ctx, src)
+		got, ferr := u.fetch(ctx, models.FetchRequest{Source: src, KnownRefs: toSet(refs[src.ID])})
 		run := models.SourceRun{SourceID: src.ID, Type: src.Type, Items: len(got.Items)}
 		status := models.SourceStatus{ID: src.ID}
 		if ferr != nil {
@@ -109,8 +116,10 @@ func (u *usecase) RunSources(ctx context.Context, input promo.InputRun) (resp mo
 	return resp, nil
 }
 
-// fetch runs one source's adapter with its own timeout and checks what came back.
-func (u *usecase) fetch(ctx context.Context, src models.Source) (resp models.FetchResult, err error) {
+// fetch runs one source's adapter with its own timeout and checks what came back. Items whose ref
+// is already stored are dropped even if the adapter returned them, so a re-run never resends them.
+func (u *usecase) fetch(ctx context.Context, req models.FetchRequest) (resp models.FetchResult, err error) {
+	src := req.Source
 	adapter, ok := u.adapters.ForType(src.Type)
 	if !ok {
 		return resp, fmt.Errorf("unknown source type %q", src.Type)
@@ -118,7 +127,7 @@ func (u *usecase) fetch(ctx context.Context, src models.Source) (resp models.Fet
 
 	ctx, cancel := context.WithTimeout(ctx, u.fetchTimeout)
 	defer cancel()
-	resp, err = adapter.FetchItems(ctx, src)
+	resp, err = adapter.FetchItems(ctx, req)
 	if err != nil {
 		return resp, err
 	}
@@ -129,7 +138,7 @@ func (u *usecase) fetch(ctx context.Context, src models.Source) (resp models.Fet
 		if it.Ref == "" {
 			return resp, fmt.Errorf("adapter %s returned an item without a ref (%s)", adapter.Type(), it.URL)
 		}
-		if seen[it.Ref] {
+		if seen[it.Ref] || req.KnownRefs[it.Ref] {
 			continue
 		}
 		seen[it.Ref] = true
@@ -139,6 +148,14 @@ func (u *usecase) fetch(ctx context.Context, src models.Source) (resp models.Fet
 	}
 	resp.Items = items
 	return resp, nil
+}
+
+func toSet(refs []string) map[string]bool {
+	set := make(map[string]bool, len(refs))
+	for _, r := range refs {
+		set[r] = true
+	}
+	return set
 }
 
 func truncate(s string, n int) string {

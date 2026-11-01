@@ -49,6 +49,17 @@ func (r *sheetRepository) UpsertRawItems(ctx context.Context, items []models.Raw
 	return resp, nil
 }
 
+func (r *sheetRepository) GetRawItemRefs(ctx context.Context) (resp map[string][]string, err error) {
+	var body struct {
+		Refs map[string][]string `json:"refs"`
+	}
+	if err = r.client.Get(ctx, "raw_item_refs", nil, &body); err != nil {
+		log.Println("[Promo][GetRawItemRefs][Repository] Problem reading raw item refs, err: ", err.Error())
+		return resp, errors.Wrap(hint(err), "sheetRepository.GetRawItemRefs")
+	}
+	return body.Refs, nil
+}
+
 func (r *sheetRepository) GetRawItems(ctx context.Context, status string) (resp []models.RawItem, err error) {
 	var body struct {
 		RawItems []struct {

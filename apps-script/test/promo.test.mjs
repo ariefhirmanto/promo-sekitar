@@ -135,6 +135,18 @@ test('GET raw_items filters by status and validates it', () => {
   assert.match(s.get({ mode: 'raw_items', status: 'all', token: 'w' }).error, /status must be one of/);
 });
 
+test('GET raw_item_refs groups stored refs by source, any status', () => {
+  const s = loadCode(tabs({ raw_items: [RAW_HEADER,
+    ['src_a:1', 'src_a', '1', 'u1', '', 't1', 'failed', 2, 'timeout', '', iso(DAY)],
+    ['src_a:2', 'src_a', '2', 'u2', '', 't2', 'parsed', 1, '', 'promo_x', iso(DAY)],
+    ['src_b:691830', 'src_b', 691830, 'u3', '', 't3', 'new', 0, '', '', iso(DAY)],
+  ] }));
+  const res = s.get({ mode: 'raw_item_refs', token: 'w' });
+  assert.equal(res.ok, true);
+  assert.deepEqual({ ...res.refs }, { src_a: ['1', '2'], src_b: ['691830'] }, 'numeric refs come back as strings');
+  assert.equal(s.get({ mode: 'raw_item_refs', token: 'r' }).error, 'unauthorized');
+});
+
 test('upsert_promos adds web promos with the new columns and clears the feed cache', () => {
   const s = loadCode(tabs());
   s.cache.set('mdm_data', '{}');

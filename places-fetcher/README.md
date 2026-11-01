@@ -27,6 +27,7 @@ sheet/                   Apps Script client shared by both jobs (token + mode, {
 promo/                   promo domain: ports (SourceReader, SourceStatusWriter, RawItemWriter/Reader,
                          PromoRepository, SourceAdapter, SourceAdapters) + InputRun
   source/                registry of source types (Register / NewSet / Names); replay/ for -items-file
+    webpage/             web_page: client, robots.txt, HTML text, host rules (katalog, giladiskon, bca, generic)
   repository/            sheet (sources, raw_items, promos), sources JSON, raw items CSV, dry-run log
   usecase/               due sources, fetch with per-source timeout, status write-back
   controller/            CLI controller: runs the usecase, logs per source
@@ -99,16 +100,39 @@ Rows with another `source` (e.g. `manual`) are never touched, so hand-added outl
 
 ## Promo job
 
-Built milestone by milestone from the promo fetcher RFC (see `../CHANGELOG.md`). As of M2 it
-reads the `sources` tab, fetches every due source through its type's adapter, stores what it read
-in `raw_items`, and writes each source's status back. Source type adapters arrive in M3 and
-parsing into `promos` in M4, so today a live run marks every source `unknown source type`; use the
-dry runs below.
+Built milestone by milestone from the promo fetcher RFC (see `../CHANGELOG.md`). As of M3 it
+reads the `sources` tab, fetches every due source through its type's adapter, stores the new items
+in `raw_items`, and writes each source's status back. Parsing into `promos` comes with M4.
 
 ```bash
 go run ./app/promos -dry-run -sources-file testdata/sources.json -items-file testdata/promo_items_2026-11-01.json
 go run ./app/promos -dry-run -source src_ramenya_katalog     # one source from the sheet, due or not
+go run ./app/promos -dry-run -sources-file testdata/sources.json   # real pages, nothing written
 ```
+
+### The `web_page` source type
+
+`promo/source/webpage` reads a page with a rule for its host. A listing rule reads the source's
+`target` and lists its items; only items whose ref isn't in `raw_items` yet (`GET
+mode=raw_item_refs`) get their own page opened, at most `WebPage.MaxNewItems` (25) per run.
+
+| Host | `target` | One item, `ref` | Text |
+|---|---|---|---|
+| katalogpromosi.com | `/restoran-dan-cafe/<slug>/` | a post in `category-<slug>`, post id | title + `entry-content`, without share buttons, related posts and banners; `posted_at` from `article:published_time` |
+| giladiskon.com | `/merchant/<slug>` | a deal in `#deal-feed`, deal slug | title + the deal page's `.prose`; no `posted_at` (the page has none) |
+| promo.bca.co.id | `/id/all/c/<category>` | a card in the Next.js payload, `idPromo` | `Brand:`, `Promo:`, `Periode:` from the card's dates + the card page's terms; `posted_at` = `publishDate` |
+| qpon.id | — | — | fails: needs headless rendering (not built); keep the source paused |
+| any other | the page | the page, hash of its text | title + `<main>` or `<article>` text |
+
+Requests send `Promo.UserAgent`, wait `WebPage.HostDelayMs` (1 s) between calls to a host, follow
+its robots.txt, and retry 429/5xx/network errors `WebPage.Retries` (2) times. One item page failing
+is skipped and retried next run; every new item page failing, or a listing that no longer has the
+expected structure, fails the source. Only the first listing page is read (newest first).
+
+Adding a host: a `<host>.go` with a `rule`, an entry in `rules` in `webpage.go`, hand-written test
+pages in `testdata/webpage/` (the markup the rule reads, invented brand and text; never a copy of
+the live page), and a live `-dry-run -source` check. Live captures go in the gitignored
+`testdata/live/`.
 
 - A source is due when it's `active` and `fetch_every_hours` has passed since `last_fetched_at`,
   less 10% of the interval (at most 2 h) so a run that starts a little early still picks it up.

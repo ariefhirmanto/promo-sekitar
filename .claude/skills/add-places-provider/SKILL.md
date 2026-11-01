@@ -98,8 +98,11 @@ re-matches every place against the aliases, so over-fetching is safe and under-f
 
 ### 5. Tests and fixture
 
-1. Fetch once with `-save-raw` and store it as `testdata/<vendor>_<yyyy-mm-dd>.json` (trim it if it's
-   over ~1 MB; keep at least one outlet per test brand and, if supported, some malls).
+1. Fetch once with `-save-raw`. Only OpenStreetMap data may be committed, as
+   `testdata/<vendor>_<yyyy-mm-dd>.json` (trim it if it's over ~1 MB; keep at least one outlet per
+   test brand and, if supported, some malls). Any other vendor's response stays in the gitignored
+   `testdata/live/` for local checks, and the committed tests use a small hand-written response file
+   with invented places (rule 12 in `.claude/rules/adapters.md`).
 2. Tests in the adapter package, mirroring `overpass/overpass_test.go`:
    - registered: `provider.New(Name, config.MainConfig{}, provider.Options{File: fixture})` works and
      `Source()` is right;

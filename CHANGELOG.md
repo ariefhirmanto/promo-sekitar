@@ -11,6 +11,7 @@ branch: one commit and one tag per milestone, so any milestone can be rolled bac
 | `promo-base` | `main` before any promo fetcher work |
 | `promo-m1` | M1: sheet tabs and Code.gs endpoints |
 | `promo-m2` | M2: promo job skeleton in Go (no source types yet) |
+| `promo-m3` | M3: `web_page` source type; Code.gs `raw_item_refs` |
 
 A change can live in three places; roll back each one the change touched.
 
@@ -25,6 +26,46 @@ A change can live in three places; roll back each one the change touched.
   Only delete them if you want them gone, and never rename existing tabs or headers.
 
 ## Unreleased
+
+### Promo fetcher M3: `web_page` source type (tag `promo-m3`)
+
+Added
+- `promo/source/webpage`, registered as `web_page`, with a rule per host: katalogpromosi.com
+  brand category pages (one item per post), giladiskon.com merchant pages (one per deal),
+  promo.bca.co.id category pages (one per promo card, with exact start/end dates), and any other
+  page as one item keyed by a hash of its text. qpon.id fails with "needs headless rendering"
+  until that is built; its source stays `paused`.
+- HTTP client: `Promo.UserAgent`, 30 s timeout, 2 retries with backoff on 429/5xx/network, 1 s
+  between requests to the same host, robots.txt honoured (read once per host per run).
+- Code.gs `GET mode=raw_item_refs`: stored refs per source in one call. Adapters open only items
+  not stored yet, at most `WebPage.MaxNewItems` (25) per source per run.
+- `WebPage:` section in `config.yaml`; `golang.org/x/net` for HTML parsing.
+- 16 adapter tests and 1 Code.gs test, on hand-written HTML test pages in `testdata/webpage/`: the
+  markup each rule reads, around an invented brand and text. No copies of live pages are committed
+  (rule 12 in `.claude/rules/adapters.md`); live captures go in the gitignored
+  `places-fetcher/testdata/live/`, and dry-run CSVs (`raw_items*.csv`) are gitignored too.
+
+Changed (fixtures)
+- `testdata/promo_items_2026-11-01.json` (from M2) now holds invented items and `example` URLs
+  instead of summaries of real posts.
+
+Changed
+- `promo.SourceAdapter.FetchItems` takes a `models.FetchRequest` (the source plus its known refs).
+  The usecase also drops any returned item whose ref is already stored.
+
+Checked live (dry run, 1 Nov 2026, nothing written): 67 new items from 5 sources in 73 s:
+BCA 12, katalogpromosi RamenYa 11 and HokBen 20, giladiskon RamenYa 11 and Chatime 13; 0 failures.
+katalogpromosi posts run 3,200–5,900 characters, so `raw_items`' 2,000-character cap keeps the
+summary and details but cuts the FAQ at the end.
+
+Deploy
+1. Paste `apps-script/Code.gs` into the Apps Script editor and save.
+2. Deploy → Manage deployments → edit → Version: New version → Deploy.
+No sheet change and no workflow yet; a scheduled run comes with the workflow milestone.
+
+Roll back: `git revert promo-m3`; in Apps Script, redeploy the previous version. An M2 build
+calling an M3 Code.gs is fine (the new mode is only read when asked for); an M3 build needs the
+M3 Code.gs for live runs (`-sources-file` dry runs don't call it).
 
 ### Promo fetcher M2: promo job skeleton (tag `promo-m2`)
 

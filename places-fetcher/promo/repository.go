@@ -20,6 +20,11 @@ type RawItemWriter interface {
 	UpsertRawItems(ctx context.Context, items []models.RawItem) (resp models.WriteResult, err error)
 }
 
+// RawItemRefReader lists the refs already stored per source id, so adapters skip opening them.
+type RawItemRefReader interface {
+	GetRawItemRefs(ctx context.Context) (resp map[string][]string, err error)
+}
+
 // RawItemReader reads raw items by status, e.g. "new" and "failed" for the parse stage.
 type RawItemReader interface {
 	GetRawItems(ctx context.Context, status string) (resp []models.RawItem, err error)
@@ -31,10 +36,10 @@ type PromoRepository interface {
 }
 
 // SourceAdapter is the port every source type implements (promo/source/<type>). One adapter
-// reads every source row of its type; FetchItems gets one row and returns its items.
+// reads every source row of its type; FetchItems gets one row and returns its new items.
 type SourceAdapter interface {
 	Type() string // matches the sources tab's type column, e.g. "web_page"
-	FetchItems(ctx context.Context, src models.Source) (resp models.FetchResult, err error)
+	FetchItems(ctx context.Context, req models.FetchRequest) (resp models.FetchResult, err error)
 }
 
 // SourceAdapters picks the adapter for a source's type (the registry, or a replay file).

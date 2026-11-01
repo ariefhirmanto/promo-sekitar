@@ -14,6 +14,7 @@ type MainConfig struct {
 	Sheet    SheetConfig
 	Outlet   OutletConfig
 	Promo    PromoConfig
+	WebPage  WebPageConfig
 }
 
 type PlacesConfig struct {
@@ -44,6 +45,14 @@ type PromoConfig struct {
 	UserAgent           string `mapstructure:"UserAgent"`
 	FetchTimeoutSeconds int    `mapstructure:"FetchTimeoutSeconds"` // per source, all its pages
 	MaxErrors           int    `mapstructure:"MaxErrors"`           // failed runs in a row before status error
+}
+
+// Settings of the web_page source adapter (promo/source/webpage).
+type WebPageConfig struct {
+	TimeoutSeconds int `mapstructure:"TimeoutSeconds"` // per request
+	Retries        int `mapstructure:"Retries"`        // after a 429, 5xx or network error
+	HostDelayMs    int `mapstructure:"HostDelayMs"`    // gap between requests to the same host
+	MaxNewItems    int `mapstructure:"MaxNewItems"`    // detail pages opened per source per run
 }
 
 // LoadConfig reads config.yaml; any key can be overridden by env, e.g. Sheet.Token → SHEET_TOKEN.

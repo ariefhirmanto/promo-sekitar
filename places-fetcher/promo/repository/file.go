@@ -33,6 +33,17 @@ func (r *sourceFileRepository) GetSources(ctx context.Context) (resp []models.So
 	return resp, errors.Wrap(err, "sourceFileRepository.GetSources.json.Unmarshal")
 }
 
+// noRefs knows no stored raw items: every item counts as new (runs with -sources-file).
+type noRefs struct{}
+
+func NewNoRefs() noRefs {
+	return noRefs{}
+}
+
+func (noRefs) GetRawItemRefs(ctx context.Context) (resp map[string][]string, err error) {
+	return map[string][]string{}, nil
+}
+
 // logStatusWriter prints the source statuses a live run would write (dry-run mode).
 type logStatusWriter struct{}
 

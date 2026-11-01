@@ -108,6 +108,14 @@ func TestGetRawItemsSplitsPromoIDs(t *testing.T) {
 	}
 }
 
+func TestGetRawItemRefs(t *testing.T) {
+	f := &fakeSheet{answers: map[string]string{"raw_item_refs": `{"ok":true,"refs":{"src_a":["1","2"]}}`}}
+	got, err := newRepo(f.server(t)).GetRawItemRefs(context.Background())
+	if err != nil || !reflect.DeepEqual(got, map[string][]string{"src_a": {"1", "2"}}) {
+		t.Fatalf("got %v, %v", got, err)
+	}
+}
+
 func TestUpsertPromosAndSheetErrors(t *testing.T) {
 	f := &fakeSheet{answers: map[string]string{"upsert_promos": `{"ok":false,"error":"promo id must look like promo_<a-z0-9_>: x"}`}}
 	_, err := newRepo(f.server(t)).UpsertPromos(context.Background(), []models.Promo{{ID: "x"}})

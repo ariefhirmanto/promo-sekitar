@@ -27,3 +27,10 @@ Promo:
   UserAgent: "makandimana-promo-fetcher/0.1"
   FetchTimeoutSeconds: 120
   MaxErrors: 3
+
+# Settings for the web_page source adapter.
+WebPage:
+  TimeoutSeconds: 30
+  Retries: 2
+  HostDelayMs: 1000   # 1 request a second per host
+  MaxNewItems: 25     # detail pages opened per source per run; the rest wait for the next run

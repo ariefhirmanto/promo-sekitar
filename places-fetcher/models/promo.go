@@ -57,6 +57,12 @@ func RawItemID(sourceID, ref string) string {
 	return sourceID + ":" + ref
 }
 
+// What a source adapter gets for one source.
+type FetchRequest struct {
+	Source    Source
+	KnownRefs map[string]bool // refs already in raw_items: list them if cheap, but don't open their pages
+}
+
 // What a source adapter returns for one source.
 type FetchResult struct {
 	Items       []RawItem // ID and SourceID are filled in by the usecase

@@ -49,8 +49,13 @@ func (a *adapter) ForType(string) (promo.SourceAdapter, bool) {
 	return a, true
 }
 
-// FetchItems returns the saved items of this source; a source with none returns an empty result.
-func (a *adapter) FetchItems(ctx context.Context, src models.Source) (resp models.FetchResult, err error) {
-	resp.Items = append(resp.Items, a.bySource[src.ID]...)
+// FetchItems returns the saved items of this source that aren't known yet; a source with none
+// returns an empty result.
+func (a *adapter) FetchItems(ctx context.Context, req models.FetchRequest) (resp models.FetchResult, err error) {
+	for _, it := range a.bySource[req.Source.ID] {
+		if !req.KnownRefs[it.Ref] {
+			resp.Items = append(resp.Items, it)
+		}
+	}
 	return resp, nil
 }

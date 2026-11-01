@@ -12,6 +12,7 @@
  * Promo fetcher (all WRITE_TOKEN; tabs `sources`, `raw_items`, `promos`):
  *   GET  {WEB_APP_URL}?token=WRITE&mode=sources                   every source row
  *   GET  {WEB_APP_URL}?token=WRITE&mode=raw_items&status=failed   raw items with that status
+ *   GET  {WEB_APP_URL}?token=WRITE&mode=raw_item_refs             stored refs per source, any status
  *   POST {WEB_APP_URL}?token=WRITE&mode=update_sources            fetcher status columns only
  *   POST {WEB_APP_URL}?token=WRITE&mode=upsert_raw_items          by id; prunes rows past 90 days
  *   POST {WEB_APP_URL}?token=WRITE&mode=upsert_promos             by id; source = web rows only
@@ -45,10 +46,11 @@ function doGet(e) {
     }) });
   }
 
-  if (p.mode === 'sources' || p.mode === 'raw_items') {
+  if (p.mode === 'sources' || p.mode === 'raw_items' || p.mode === 'raw_item_refs') {
     if (!authorized_(p, 'WRITE_TOKEN')) return json_({ ok: false, error: 'unauthorized' });
     try {
       if (p.mode === 'sources') return json_({ ok: true, sources: getSources_() });
+      if (p.mode === 'raw_item_refs') return json_({ ok: true, refs: getRawItemRefs_() });
       return json_({ ok: true, raw_items: getRawItems_(String(p.status || '')) });
     } catch (err) {
       return json_({ ok: false, error: String(err && err.message || err) });
@@ -261,6 +263,18 @@ function getRawItems_(status) {
       obj.attempts = Number(r.attempts) || 0;
       return obj;
     });
+}
+
+// { source_id: [ref, ...] } for every stored raw item, so an adapter only opens items it hasn't read.
+function getRawItemRefs_() {
+  const refs = {};
+  readTab_('raw_items').forEach(function (r) {
+    const src = String(r.source_id || '').trim();
+    const ref = String(r.ref || '').trim();
+    if (!src || !ref) return;
+    (refs[src] = refs[src] || []).push(ref);
+  });
+  return refs;
 }
 
 // Adds or updates by id, then drops rows fetched more than RAW_KEEP_DAYS ago. The tab is the fetcher's,
