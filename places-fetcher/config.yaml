@@ -13,7 +13,7 @@ Overpass:
   Retries: 3
   RetryWaitSeconds: 30
 
-# Keep URL and Token empty here; set SHEET_URL and SHEET_TOKEN in the environment.
+# Keep URL and Token empty here; set SHEET_URL and SHEET_TOKEN (the Apps Script WRITE_TOKEN) in the environment.
 Sheet:
   URL: ""
   Token: ""

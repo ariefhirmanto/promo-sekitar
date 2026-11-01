@@ -4,16 +4,23 @@
  * Reads three tabs (brands, outlets, promos) from the spreadsheet this script is bound to
  * and serves the feed as JSON.
  *
- *   GET {WEB_APP_URL}?token=...&mode=swipe&cells=0:88658c1a9bfffff,1:88658c1a9dfffff&offset=0&limit=10
- *   GET {WEB_APP_URL}?token=...&mode=nearby&cells=...
- *   GET {WEB_APP_URL}?token=...&mode=brands                 (places fetcher reads its brand list)
- *   POST {WEB_APP_URL}?token=...&mode=upsert_outlets        (places fetcher writes the outlets tab)
+ *   GET {WEB_APP_URL}?token=READ&mode=swipe&cells=0:88658c1a9bfffff,1:88658c1a9dfffff&offset=0&limit=10
+ *   GET {WEB_APP_URL}?token=READ&mode=nearby&cells=...
+ *   GET {WEB_APP_URL}?token=WRITE&mode=brands                (places fetcher reads its brand list)
+ *   POST {WEB_APP_URL}?token=WRITE&mode=upsert_outlets       (places fetcher writes the outlets tab)
  *
  * `cells` is "ring:h3cell" pairs computed on the phone with h3-js (gridDisk with distances),
  * so this script never needs an H3 library and never sees coordinates.
  *
- * Setup: Project Settings → Script properties → add TOKEN.
+ * Two tokens, so a leaked feed token can't change the sheet:
+ *   READ_TOKEN   feed reads; held by the Next.js server (server-only env var, never in the browser)
+ *   WRITE_TOKEN  fetcher calls; held by GitHub Actions secrets (SHEET_TOKEN)
+ * A call whose token property isn't set is refused.
+ *
+ * Setup: Project Settings → Script properties → add READ_TOKEN and WRITE_TOKEN (two different
+ * long random values), then delete the old TOKEN property.
  * Deploy: Deploy → New deployment → Web app → Execute as: Me → Who has access: Anyone.
+ * Keep the spreadsheet itself shared as Restricted; the web app reads it as you.
  */
 
 const TZ = 'Asia/Jakarta';
@@ -22,14 +29,15 @@ const MAX_LIMIT = 50;
 
 function doGet(e) {
   const p = (e && e.parameter) || {};
-  const token = PropertiesService.getScriptProperties().getProperty('TOKEN');
-  if (token && p.token !== token) return json_({ ok: false, error: 'unauthorized' });
 
   if (p.mode === 'brands') {
+    if (!authorized_(p, 'WRITE_TOKEN')) return json_({ ok: false, error: 'unauthorized' });
     return json_({ ok: true, brands: readTab_('brands').map(function (b) {
       return { id: String(b.id), name: String(b.name), aliases: String(b.aliases || '') };
     }) });
   }
+
+  if (!authorized_(p, 'READ_TOKEN')) return json_({ ok: false, error: 'unauthorized' });
 
   const mode = p.mode === 'nearby' ? 'nearby' : 'swipe';
   const ringOf = parseCells_(p.cells);
@@ -47,6 +55,12 @@ function doGet(e) {
   }
 }
 
+// True when the request's token matches the named script property; an unset property refuses.
+function authorized_(p, property) {
+  const expected = PropertiesService.getScriptProperties().getProperty(property);
+  return !!expected && p.token === expected;
+}
+
 /* ---------- places fetcher writes ---------- */
 
 const OUTLET_FIELDS = ['id', 'brand_id', 'name', 'address', 'lat', 'lng', 'h3_r8', 'h3_r6', 'format', 'mall_name', 'source'];
@@ -54,8 +68,7 @@ const CLOSE_AFTER_DAYS = 25;   // missing from two twice-a-month runs → closed
 
 function doPost(e) {
   const p = (e && e.parameter) || {};
-  const token = PropertiesService.getScriptProperties().getProperty('TOKEN');
-  if (!token || p.token !== token) return json_({ ok: false, error: 'unauthorized' }); // writes always need a token
+  if (!authorized_(p, 'WRITE_TOKEN')) return json_({ ok: false, error: 'unauthorized' });
   if (p.mode !== 'upsert_outlets') return json_({ ok: false, error: 'unknown mode' });
 
   const lock = LockService.getScriptLock();

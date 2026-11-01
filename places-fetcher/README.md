@@ -48,9 +48,11 @@ stay untouched.
 ## One-time setup
 
 1. Replace the Apps Script code with `../apps-script/Code.gs` (adds `mode=brands` and `doPost`).
-2. Script properties: `TOKEN` must be set (writes are refused without it).
+2. Script properties: `READ_TOKEN` (the Next.js server's feed reads) and `WRITE_TOKEN` (the
+   fetchers), two different random values; delete any old `TOKEN`. A call is refused when its
+   property is missing.
 3. Deploy → Manage deployments → edit → **New version** (the URL stays the same).
-4. GitHub repo secrets: `SHEET_URL` (the `/exec` URL) and `SHEET_TOKEN`.
+4. GitHub repo secrets: `SHEET_URL` (the `/exec` URL) and `SHEET_TOKEN` = the `WRITE_TOKEN` value.
 
 ## Run
 

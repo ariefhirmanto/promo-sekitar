@@ -23,6 +23,10 @@ fetcher writes.
   promos depend on them. New columns are fine; Code.gs reads by header name.
 - Rows with `source = manual` belong to the user; code must never update or close them.
 - Secrets (`SHEET_URL`, `SHEET_TOKEN`, vendor keys) come from env / GitHub secrets, never files.
+- Two Apps Script tokens: `READ_TOKEN` for feed reads (Next.js server only, never in browser code
+  or a `NEXT_PUBLIC_` var) and `WRITE_TOKEN` for fetchers (`SHEET_TOKEN`). A new endpoint picks
+  one with `authorized_(p, '<PROPERTY>')`; anything that changes the sheet takes `WRITE_TOKEN`.
+- The spreadsheet stays shared as Restricted; the web app runs as its owner.
 - After changing `apps-script/Code.gs`, remind the user to paste it into Apps Script and deploy a
   new version (Deploy → Manage deployments → edit → New version).
 - Match the existing style: log lines like `[Outlet][Method][Layer]`, errors wrapped with
