@@ -27,3 +27,13 @@ export function formatDistance(m: number): string {
   if (m < 1000) return `${Math.round(m / 10) * 10} m`;
   return `${(m / 1000).toFixed(1).replace(".", ",")} km`;
 }
+
+const WALK_M_PER_MIN = 80; // about 4.8 km/h
+const WALK_MAX_M = 2000; // beyond this, a walking time isn't a useful hint
+
+// walkLabel is the walking time for a straight-line distance ("5 mnt jalan kaki"), or "" when
+// it's too far to walk. Streets add some distance, so it's a lower bound.
+export function walkLabel(m: number): string {
+  if (m > WALK_MAX_M) return "";
+  return `${Math.max(1, Math.round(m / WALK_M_PER_MIN))} mnt jalan kaki`;
+}

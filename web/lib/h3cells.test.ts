@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { parseFeedQuery } from "./feedQuery";
-import { distanceM, formatDistance, ringCells } from "./h3cells";
+import { distanceM, formatDistance, ringCells, walkLabel } from "./h3cells";
 
 describe("ringCells", () => {
   // Same point and cell as the example outlet row in the sheet (and the Go fetcher's H3 test).
@@ -29,5 +29,14 @@ describe("distance", () => {
     expect(m).toBeLessThan(690);
     expect(formatDistance(m)).toMatch(/^\d+ m$/);
     expect(formatDistance(2345)).toBe("2,3 km");
+  });
+
+  it.each([
+    [30, "1 mnt jalan kaki"], // never "0 mnt"
+    [650, "8 mnt jalan kaki"],
+    [2000, "25 mnt jalan kaki"],
+    [2001, ""], // too far to suggest walking
+  ])("walkLabel(%i m)", (m, want) => {
+    expect(walkLabel(m)).toBe(want);
   });
 });

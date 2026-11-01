@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { distanceM, formatDistance, ringCells } from "@/lib/h3cells";
+import { distanceM, formatDistance, ringCells, walkLabel } from "@/lib/h3cells";
+import { directionsUrl } from "@/lib/maps";
 import { channelLabel, promoStatus, todayJakarta } from "@/lib/promoStatus";
 import type { FeedError, FeedItem, FeedResponse } from "@/lib/types";
 import styles from "./SwipeDeck.module.css";
@@ -93,7 +94,14 @@ export default function SwipeDeck() {
       <p className={styles.lede}>
         Geser ke kanan atau ketuk “Mau” untuk membuka promonya. Geser ke kiri untuk lewat.
       </p>
-      {note && <p className={styles.note}>{note}</p>}
+      {note && (
+        <p className={styles.note}>
+          {note}{" "}
+          {"geolocation" in globalThis.navigator ? (
+            <button className={styles.link} onClick={() => locate(rings)}>Aktifkan lokasi</button>
+          ) : null}
+        </p>
+      )}
 
       {(phase === "locating" || phase === "loading") && (
         <p className={styles.state}>{phase === "locating" ? "Mencari lokasimu…" : "Memuat promo…"}</p>
@@ -151,17 +159,12 @@ export default function SwipeDeck() {
           >
             <Stamp item={card} today={today} />
             <div className={styles.brand}>{card.brand}</div>
+            <Distance outlet={card.outlet} pos={pos} />
             <p className={styles.deal}>
               <strong>{card.title}.</strong> {card.deal}
             </p>
             <ul className={styles.tags}>
               <li>{channelLabel(card.channel)}</li>
-              {card.outlet && (
-                <li>
-                  {card.outlet.name}
-                  {pos && ` · ${formatDistance(distanceM(pos.lat, pos.lng, card.outlet.lat, card.outlet.lng))}`}
-                </li>
-              )}
               {card.other_promos ? <li>+{card.other_promos} promo lain</li> : null}
             </ul>
           </article>
@@ -172,6 +175,56 @@ export default function SwipeDeck() {
         </>
       )}
     </section>
+  );
+}
+
+// Distance is measured on the phone, from its own position to the outlet's coordinates, so it's
+// exact (straight line) rather than the ring band the server sorted by.
+function Distance({ outlet, pos }: { outlet: FeedItem["outlet"]; pos: Position | null }) {
+  if (!pos) {
+    return (
+      <p className={`${styles.distance} ${styles.unknown}`}>
+        <PinIcon /> Jarak muncul setelah lokasi aktif
+      </p>
+    );
+  }
+  if (!outlet) {
+    return (
+      <p className={`${styles.distance} ${styles.unknown}`}>
+        <PinIcon /> Belum ada outlet di dekatmu
+      </p>
+    );
+  }
+  const m = distanceM(pos.lat, pos.lng, outlet.lat, outlet.lng);
+  const walk = walkLabel(m);
+  return (
+    <p className={styles.distance}>
+      <PinIcon />
+      <strong>{formatDistance(m)}</strong>
+      {walk && <span>· {walk}</span>}
+      <a
+        className={styles.route}
+        href={directionsUrl(outlet, walk !== "")}
+        target="_blank"
+        rel="noopener noreferrer"
+        aria-label={`Rute ke ${outlet.name} di Google Maps`}
+        // The card is tappable ("Mau") and draggable: keep this link's taps, drags and Enter to itself.
+        onPointerDown={(e) => e.stopPropagation()}
+        onClick={(e) => e.stopPropagation()}
+        onKeyDown={(e) => e.stopPropagation()}
+      >
+        Rute ↗
+      </a>
+      <span className={styles.outletName}>{outlet.name}</span>
+    </p>
+  );
+}
+
+function PinIcon() {
+  return (
+    <svg className={styles.pin} viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M12 2C8.1 2 5 5 5 8.9 5 14.1 12 22 12 22s7-7.9 7-13.1C19 5 15.9 2 12 2zm0 9.6a2.6 2.6 0 1 1 0-5.2 2.6 2.6 0 0 1 0 5.2z" fill="currentColor" />
+    </svg>
   );
 }
 

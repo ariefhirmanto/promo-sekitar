@@ -65,6 +65,55 @@
   margin: 0 0 12px;
 }
 
+.distance {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 2px 6px;
+  margin: 0 0 12px;
+  color: var(--leaf);
+  font-weight: 600;
+}
+
+.distance strong {
+  font-size: 1.1rem;
+}
+
+.distance.unknown {
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.pin {
+  width: 18px;
+  height: 18px;
+  flex: none;
+}
+
+.route {
+  margin-left: auto;
+  padding: 4px 10px;
+  border: 1.5px solid currentColor;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--leaf);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.route:hover {
+  background: var(--bg);
+}
+
+.outletName {
+  flex-basis: 100%;
+  padding-left: 24px;
+  color: var(--muted);
+  font-weight: 400;
+  font-size: 0.9rem;
+}
+
 .tags {
   display: flex;
   flex-wrap: wrap;
