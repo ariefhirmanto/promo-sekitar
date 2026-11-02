@@ -7,46 +7,18 @@ import (
 	"sort"
 	"strings"
 
+	"places-fetcher/match"
 	"places-fetcher/models"
 	"places-fetcher/outlet"
 )
 
-var nonWord = regexp.MustCompile(`[^a-z0-9]+`)
-
-// Compact lowercases and drops everything but letters and digits; "+" becomes "plus" so
-// "HokBen+" stays distinct from "HokBen".
-func Compact(s string) string {
-	s = strings.ReplaceAll(strings.ToLower(s), "+", "plus")
-	return nonWord.ReplaceAllString(s, "")
-}
+// Compact is match.Compact, kept here for the places job's callers.
+func Compact(s string) string { return match.Compact(s) }
 
 // MatchBrand returns the brand and alias with the longest alias found in the place's name or
 // alternative names, so "HokBen+ Kemang" picks the "HokBen+" alias over "HokBen".
 func MatchBrand(p models.Place, brands []models.Brand) (models.Brand, string, bool) {
-	var hay []string
-	for _, n := range append([]string{p.Name}, p.AltNames...) {
-		if v := Compact(n); v != "" {
-			hay = append(hay, v)
-		}
-	}
-
-	var best models.Brand
-	bestAlias := ""
-	for _, b := range brands {
-		for _, a := range b.Names() {
-			ca := Compact(a)
-			if len(ca) < 4 || len(ca) <= len(Compact(bestAlias)) {
-				continue
-			}
-			for _, h := range hay {
-				if strings.Contains(h, ca) {
-					best, bestAlias = b, a
-					break
-				}
-			}
-		}
-	}
-	return best, bestAlias, bestAlias != ""
+	return match.BestBrand(append([]string{p.Name}, p.AltNames...), brands)
 }
 
 // FormatFor keeps sub-brand aliases that extend the brand name ("HokBen+", "HokBen 24 Jam");

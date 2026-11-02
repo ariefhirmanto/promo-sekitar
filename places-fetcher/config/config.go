@@ -13,6 +13,10 @@ type MainConfig struct {
 	Overpass OverpassConfig
 	Sheet    SheetConfig
 	Outlet   OutletConfig
+	Promo    PromoConfig
+	WebPage  WebPageConfig
+	Parser   ParserConfig
+	Claude   ClaudeConfig
 }
 
 type PlacesConfig struct {
@@ -38,6 +42,40 @@ type OutletConfig struct {
 	MergeRadiusM float64 `mapstructure:"MergeRadiusM"`
 }
 
+// Settings of the promo job (go run ./app/promos); each source adapter reads its own section.
+type PromoConfig struct {
+	UserAgent           string `mapstructure:"UserAgent"`
+	FetchTimeoutSeconds int    `mapstructure:"FetchTimeoutSeconds"` // per source, all its pages
+	MaxErrors           int    `mapstructure:"MaxErrors"`           // failed runs in a row before status error
+}
+
+// Settings of the web_page source adapter (promo/source/webpage).
+type WebPageConfig struct {
+	TimeoutSeconds int `mapstructure:"TimeoutSeconds"` // per request
+	Retries        int `mapstructure:"Retries"`        // after a 429, 5xx or network error
+	HostDelayMs    int `mapstructure:"HostDelayMs"`    // gap between requests to the same host
+	MaxNewItems    int `mapstructure:"MaxNewItems"`    // detail pages opened per source per run
+}
+
+// Settings of the promo job's parse stage; Name picks the adapter in promo/parser.
+type ParserConfig struct {
+	Name      string  `mapstructure:"Name"`      // registered parser, e.g. "claude"
+	Retries   int     `mapstructure:"Retries"`   // later runs that parse a failed item again
+	BudgetUSD float64 `mapstructure:"BudgetUSD"` // per run; the rest of the items wait for the next run
+	HideBelow float64 `mapstructure:"HideBelow"` // promos read with less confidence are saved hidden
+}
+
+// Settings of the claude parser adapter (promo/parser/claude). APIKey comes from ANTHROPIC_API_KEY.
+type ClaudeConfig struct {
+	APIKey           string  `mapstructure:"APIKey"`
+	Model            string  `mapstructure:"Model"`
+	Effort           string  `mapstructure:"Effort"` // low, medium, high
+	MaxTokens        int     `mapstructure:"MaxTokens"`
+	TimeoutSeconds   int     `mapstructure:"TimeoutSeconds"`
+	InputUSDPerMTok  float64 `mapstructure:"InputUSDPerMTok"`
+	OutputUSDPerMTok float64 `mapstructure:"OutputUSDPerMTok"`
+}
+
 // LoadConfig reads config.yaml; any key can be overridden by env, e.g. Sheet.Token → SHEET_TOKEN.
 func LoadConfig(path string) (config MainConfig) {
 	viper.AddConfigPath(path)
@@ -46,6 +84,7 @@ func LoadConfig(path string) (config MainConfig) {
 
 	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 	viper.AutomaticEnv()
+	exception.PanicIfNeeded(viper.BindEnv("Claude.APIKey", "ANTHROPIC_API_KEY")) // the SDK's usual name
 
 	err := viper.ReadInConfig()
 	exception.PanicIfNeeded(err)

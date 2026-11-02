@@ -1,0 +1,37 @@
+[
+  {
+    "source_id": "src_ramenya_katalog",
+    "ref": "1001",
+    "url": "https://aggregator.example/promo-es-krim-rp5000/",
+    "posted_at": "2026-10-29T12:00:00+07:00",
+    "text": "Es krim tiga rasa Rp5.000 di dua outlet pilihan: Outlet Satu dan Outlet Dua. Dine-in dan takeaway, selama persediaan masih ada."
+  },
+  {
+    "source_id": "src_ramenya_katalog",
+    "ref": "1002",
+    "url": "https://aggregator.example/menu-baru-nasi-kuah/",
+    "posted_at": "2026-06-08T13:00:00+07:00",
+    "text": "Menu baru: kuah dengan nasi hangat mulai Rp30.000 di semua outlet. Harga belum termasuk pajak."
+  },
+  {
+    "source_id": "src_ramenya_katalog",
+    "ref": "1003",
+    "url": "https://aggregator.example/paket-pelajar-berdua/",
+    "posted_at": "2026-10-22T10:00:00+07:00",
+    "text": "Paket pelajar berdua Rp45.000-an per orang. Senin sampai Jumat, makan di tempat, tunjukkan kartu pelajar. Tidak bisa digabung promo lain."
+  },
+  {
+    "source_id": "src_ramenya_giladiskon",
+    "ref": "paket-pelajar-berdua",
+    "url": "https://deals.example/deals/paket-pelajar-berdua",
+    "posted_at": "2026-10-22T09:00:00+07:00",
+    "text": "Paket pelajar berdua Rp45.000/orang. Senin-Jumat, khusus pelajar dengan kartu pelajar, makan di tempat."
+  },
+  {
+    "source_id": "src_hokben_giladiskon",
+    "ref": "paket-gajian-rp50-ribuan",
+    "url": "https://deals.example/deals/paket-gajian-rp50-ribuan",
+    "posted_at": "2026-10-27T10:00:00+07:00",
+    "text": "Paket gajian dua menu Rp50 ribuan per orang termasuk minuman, 27 Oktober sampai 2 November 2026. Harga sebelum pajak."
+  }
+]

@@ -38,9 +38,9 @@ contract it applies.
 6. **Fail loudly.** Timeouts, quota errors, truncated responses, pages that stop early, and
    pages that render without the expected list return an error, never a partial result as
    success. A partial places result closes real outlets after 25 days.
-7. **Replay and record.** Every adapter honours its registry's `Options`: `File` replays a saved
-   raw response instead of calling the service, `SaveRaw` writes the raw response after a
-   successful fetch. Tests run on these files, never on the network.
+7. **Replay and record.** Every adapter can replay saved input instead of calling the service
+   (places: `Options.File` / `SaveRaw`; promo sources: a `fileFetcher` or `-items-file`). Tests
+   run on saved or built input, never on the network.
 8. **Be a good client.** Every call takes `ctx` and has a timeout; retries use backoff
    (`overpass/client.go`). Follow the service's rate limits and robots.txt, send the configured
    `UserAgent`, and space requests per host (1 per second by default, the `Crawl-delay` where
@@ -56,6 +56,19 @@ contract it applies.
       row it came from goes in `source_ids`, and an item's ref must be stable across runs.
 11. **Cost check first** for any service that bills per call (a paid places API, an AI parser):
     estimate calls per run and per month and get the user's OK before building.
+12. **No copies of third-party pages in the repo.** HTML, JSON or text saved from a live site
+    (promo pages, aggregators, banks, vendor responses), and summaries or paraphrases of it,
+    are never committed, staged or pushed: the repo may be public. Instead:
+    - Test pages are hand-written HTML files in `testdata/webpage/<host>_<what>.html`: the
+      markup the rule reads (tags, ids, classes, meta), around an invented brand ("Mie Contoh")
+      and invented text, with `example` URLs where a URL isn't what the rule checks. Never paste
+      a live page in and edit it down.
+    - Live captures for checking a rule against the real site go in `places-fetcher/testdata/live/`
+      or a `*.live.html` / `*.live.json` file (gitignored), or outside the repo; check the rule
+      with a `-dry-run`, never by committing its output.
+    - Before staging, `git status` must show nothing under `testdata/` that came from a live page.
+    The one exception is OpenStreetMap data (ODbL, attributed in the README), like
+    `testdata/overpass_2026-11-01.json`.
 
 ## Files
 
@@ -66,13 +79,21 @@ contract it applies.
   query.go         request building from the port's input, if the service needs it
   transform.go     raw response → models.*; vendor types unexported
   <name>_test.go   registered via the registry's New, transform, error cases
-testdata/<name>_<yyyy-mm-dd>.json   saved raw response (trim past ~1 MB)
+testdata/<name>_<yyyy-mm-dd>.json   saved raw response: OpenStreetMap only (rule 12), trim past ~1 MB
+testdata/webpage/<host>_<what>.html hand-written test pages, invented brand and text (rule 12)
+testdata/live/                      gitignored live captures for local checks
 ```
+
+Promo parsers share everything that isn't the service: `promo/parser/prompt` holds the
+instructions, schema, request blocks, reply checks (`Read`) and retry loop (`Run`). A parser
+package only calls its service (`query.go` lays the blocks out for it), maps the reply to text,
+and prices the call; never copy the prompt or the checks into it.
 
 ## Done when
 
-- Tests cover: registration through the registry's `New` with `Options{File: fixture}`, the
-  transform of a small inline response (every model field), and at least one error response.
+- Tests cover: registration through the registry, the transform of a small inline response
+  (every model field), and at least one error response, all on saved or built input (rule 12).
+- Nothing staged under `testdata/` comes from a live page.
 - `gofmt -l .`, `go vet ./...` and `go test ./...` pass in WSL, and the layer check in
   `clean-architecture.md` prints `layers ok`.
 - A `-dry-run` with the new adapter has been compared with the current one (counts, false

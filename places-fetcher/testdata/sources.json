@@ -1,0 +1,7 @@
+[
+  { "id": "src_bca_fnb", "type": "web_page", "target": "https://promo.bca.co.id/id/all/c/fnb", "brand_id": "", "is_aggregator": true, "fetch_every_hours": 24, "status": "active" },
+  { "id": "src_ramenya_katalog", "type": "web_page", "target": "https://katalogpromosi.com/restoran-dan-cafe/ramenya/", "brand_id": "brand_ramenya", "fetch_every_hours": 24, "status": "active" },
+  { "id": "src_ramenya_giladiskon", "type": "web_page", "target": "https://www.giladiskon.com/merchant/ramen-ya", "brand_id": "brand_ramenya", "fetch_every_hours": 24, "status": "active", "last_fetched_at": "2026-11-01T06:00:00+07:00" },
+  { "id": "src_ramenya_qpon", "type": "web_page", "target": "https://qpon.id/", "brand_id": "brand_ramenya", "fetch_every_hours": 24, "status": "paused", "notes": "Needs headless Chrome and the RamenYa brand page URL" },
+  { "id": "src_hokben_giladiskon", "type": "web_page", "target": "https://www.giladiskon.com/merchant/hokben", "brand_id": "brand_hokben", "fetch_every_hours": 24, "status": "active", "error_count": 2, "last_error": "HTTP 503" }
+]
