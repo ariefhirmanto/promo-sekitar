@@ -29,6 +29,18 @@ A change can live in three places; roll back each one the change touched.
 
 ## Unreleased
 
+### Fix: promo outlet limits matched outlets they don't name
+
+Found in a local parse dry run of the HokBen katalogpromosi page with outlets.
+
+Fixed
+- A place the promo names ("HokBen Sulawesi Selatan") no longer matches every outlet whose name is
+  just the brand ("HokBen"): an outlet name only matches when it holds the place.
+- A mall named inside the place ("HokBen Grand Indonesia") still matches, but by whole words, so
+  "Pakuwon Mall" no longer matches "ÆON Mall" (compacted, "onmall" sits inside "pakuwonmall").
+
+Deploy: nothing; the next promo run uses it. Roll back: `git revert` this commit.
+
 ### Promo fetcher M6: rules and skills (tag `promo-m6`)
 
 Added

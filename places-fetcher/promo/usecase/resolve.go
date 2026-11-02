@@ -6,6 +6,7 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"unicode"
 
 	"places-fetcher/match"
 	"places-fetcher/models"
@@ -53,7 +54,7 @@ func matchOutlets(limits []models.OutletLimit, outlets []models.Outlet) (ids []s
 		}
 		found := false
 		for _, o := range outlets {
-			if outletMatches(l.Kind, want, o) {
+			if outletMatches(l.Kind, l.Name, want, o) {
 				set[o.ID] = true
 				found = true
 			}
@@ -69,10 +70,10 @@ func matchOutlets(limits []models.OutletLimit, outlets []models.Outlet) (ids []s
 	return ids, ok
 }
 
-func outletMatches(kind, want string, o models.Outlet) bool {
+// outletMatches checks one limit against one outlet. want is the limit's name compacted.
+func outletMatches(kind, name, want string, o models.Outlet) bool {
 	contains := func(field string) bool {
-		f := match.Compact(field)
-		return f != "" && (strings.Contains(f, want) || (len(f) >= 4 && strings.Contains(want, f)))
+		return strings.Contains(match.Compact(field), want)
 	}
 	switch kind {
 	case "city":
@@ -80,8 +81,22 @@ func outletMatches(kind, want string, o models.Outlet) bool {
 	case "format":
 		return match.Compact(o.Format) == want
 	default: // mall or outlet
-		return contains(o.MallName) || contains(o.Name)
+		// The other way round only for whole words of the mall: "HokBen Grand Indonesia" names
+		// the mall "Grand Indonesia", but "Pakuwon Mall" doesn't name "ÆON Mall". Never for the
+		// outlet name, which is often just the brand that every place the promo names contains.
+		return contains(o.Name) || contains(o.MallName) || hasWords(name, o.MallName)
 	}
+}
+
+// hasWords reports whether the words of part appear in s, in order and next to each other.
+func hasWords(s, part string) bool {
+	w := func(v string) string {
+		return " " + strings.Join(strings.FieldsFunc(strings.ToLower(v), func(r rune) bool {
+			return !unicode.IsLetter(r) && !unicode.IsDigit(r)
+		}), " ") + " "
+	}
+	p := w(part)
+	return p != "  " && strings.Contains(w(s), p)
 }
 
 // dedupeKey identifies a promo across sources and runs: the brand, the deal's numbers (so

@@ -338,3 +338,27 @@ func TestDedupeKeyMeetsAcrossWordings(t *testing.T) {
 		t.Fatalf("no numbers falls back to the compact deal: %s", dedupeKey(c))
 	}
 }
+
+func TestMatchOutletsIgnoresBareBrandNames(t *testing.T) {
+	outlets := []models.Outlet{
+		{ID: "out_osm_n1", Name: "Mie Contoh", Address: "Jl. Contoh 1, Jakarta Selatan"},
+		{ID: "out_osm_n2", Name: "Mie Contoh Mal Contoh Raya", Address: "Jl. Contoh 2, Depok"},
+		{ID: "out_osm_n3", Name: "Mie Contoh", MallName: "Mal Contoh Raya", Address: "Jl. Contoh 3, Depok"},
+		{ID: "out_osm_n4", Name: "Mie Contoh", MallName: "ÆON Mall", Address: "Jl. Contoh 4, Tangerang"},
+	}
+	// "Pakuwon Mall" holds the letters of "ÆON Mall" (compacted "onmall"), not its words
+	if ids, ok := matchOutlets([]models.OutletLimit{{Kind: "mall", Name: "Pakuwon Mall"}}, outlets); ok || len(ids) != 0 {
+		t.Fatalf("matched a mall by letters: %v %v", ids, ok)
+	}
+	if ids, _ := matchOutlets([]models.OutletLimit{{Kind: "mall", Name: "Mie Contoh ÆON Mall"}}, outlets); strings.Join(ids, ",") != "out_osm_n4" {
+		t.Fatalf("mall named inside the limit: %v", ids)
+	}
+	// a place outside the outlets' area, named with the brand: an outlet called just "Mie Contoh" is no match
+	if ids, ok := matchOutlets([]models.OutletLimit{{Kind: "outlet", Name: "Mie Contoh Sulawesi Selatan"}}, outlets); ok || len(ids) != 0 {
+		t.Fatalf("bare brand name matched: %v %v", ids, ok)
+	}
+	ids, ok := matchOutlets([]models.OutletLimit{{Kind: "mall", Name: "Mie Contoh Mal Contoh Raya"}}, outlets)
+	if !ok || strings.Join(ids, ",") != "out_osm_n2,out_osm_n3" {
+		t.Fatalf("mall by outlet name or mall_name: %v %v", ids, ok)
+	}
+}
