@@ -14,8 +14,9 @@ fetcher writes.
     `promo/source/<type>`, parsers under `promo/parser/<name>` (shared prompt in
     `promo/parser/prompt`). Design: the promo fetcher RFC (linked in `CHANGELOG.md`).
 - `.github/workflows/places_refresh.yml`: runs the places job on the 2nd and 16th, 03:00 WIB.
-- `.github/workflows/promos_daily.yml`: the promo job, 06:00 WIB daily once its schedule is
-  uncommented; until then, by hand (dry run by default).
+- `.github/workflows/promos_daily.yml`: the promo job, 03:00 WIB daily (writes the sheet); by
+  hand from Actions, a dry run by default. It and `places_refresh` share the `sheet-writes`
+  concurrency group, so they never write the sheet at once.
 - `web/`: Next.js 16 app (App Router, Cache Components). Read `web/AGENTS.md` and the docs in
   `web/node_modules/next/dist/docs/` before changing it: APIs differ from older Next.js.
 

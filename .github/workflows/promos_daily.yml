@@ -1,10 +1,10 @@
 name: promos_daily
 
-# Committed disabled: the schedule is commented out until a clean dry run, and until the
-# SHEET_URL, SHEET_TOKEN and ANTHROPIC_API_KEY secrets are set. Enable by uncommenting it.
+# Scheduled runs write the sheet (no -dry-run); manual runs are dry runs unless unticked.
+# Needs the SHEET_URL, SHEET_TOKEN and ANTHROPIC_API_KEY secrets.
 on:
-  # schedule:
-  #   - cron: "0 23 * * *"   # 23:00 UTC = 06:00 WIB, every day
+  schedule:
+    - cron: "0 20 * * *"   # 20:00 UTC = 03:00 WIB, every day
   workflow_dispatch:
     inputs:
       source:
@@ -15,6 +15,12 @@ on:
         description: "Dry run: read the sheet and call the parser, write nothing to the sheet"
         type: boolean
         default: true
+
+# places_refresh starts at the same time on the 2nd and 16th; one group queues the two, so they
+# never write the sheet at once (Code.gs waits only 30 s for its lock).
+concurrency:
+  group: sheet-writes
+  cancel-in-progress: false
 
 jobs:
   promos:
