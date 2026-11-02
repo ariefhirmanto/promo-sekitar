@@ -74,6 +74,12 @@ func (p *claudeParser) Parse(ctx context.Context, req models.ParseRequest) (resp
 			if errors.As(err, &apiErr) && apiErr.StatusCode == http.StatusBadRequest {
 				return "", &models.ParseError{Reason: "request refused: " + apiErr.Error()}
 			}
+			// every attempt for this item timed out while the run still has time: the item's
+			// failure, tried again next run, so one slow reply doesn't stop the others
+			if errors.Is(err, context.DeadlineExceeded) && ctx.Err() == nil {
+				log.Printf("[Promo][Parse][Claude] Item %s timed out after %d attempts", req.Item.ID, retries+1)
+				return "", &models.ParseError{Reason: fmt.Sprintf("timed out after %d attempts", retries+1)}
+			}
 			log.Println("[Promo][Parse][Claude] Problem calling the Messages API, err: ", err.Error())
 			return "", pkgerrors.Wrap(err, "claude.Parse.Messages.New")
 		}

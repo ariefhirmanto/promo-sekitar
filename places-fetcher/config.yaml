@@ -48,6 +48,6 @@ Claude:
   Model: "claude-haiku-5-5"
   Effort: "low"             # extraction needs no more; thinking is billed as output
   MaxTokens: 4096
-  TimeoutSeconds: 60
+  TimeoutSeconds: 60        # per attempt; a hung attempt is retried twice, then the item fails for this run
   InputUSDPerMTok: 0.10     # claude-haiku-5-5 list prices, for the budget
   OutputUSDPerMTok: 0.50

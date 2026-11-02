@@ -197,3 +197,53 @@ func TestRegistry(t *testing.T) {
 		t.Fatalf("an unknown name lists the registered ones: %v", err)
 	}
 }
+
+// hangingServer stalls the first `hang` requests past the client's timeout, then answers okReply.
+func hangingServer(t *testing.T, hang int) (*httptest.Server, *int) {
+	calls := 0
+	body, _ := json.Marshal(map[string]any{
+		"id": "msg_1", "type": "message", "role": "assistant", "model": "claude-haiku-5-5", "stop_reason": "end_turn",
+		"content": []map[string]any{{"type": "text", "text": okReply}},
+		"usage":   map[string]any{"input_tokens": 10, "output_tokens": 10},
+	})
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls++
+		if calls <= hang {
+			select {
+			case <-r.Context().Done():
+			case <-time.After(2 * time.Second):
+			}
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.Write(body)
+	}))
+	t.Cleanup(srv.Close)
+	return srv, &calls
+}
+
+func TestParseTimeouts(t *testing.T) {
+	// one attempt hangs: the SDK tries again and the item parses
+	srv, calls := hangingServer(t, 1)
+	p := testParser(newSDKClient("test", 200*time.Millisecond, option.WithBaseURL(srv.URL)))
+	if resp, err := p.Parse(context.Background(), req); err != nil || len(resp.Promos) != 1 || *calls != 2 {
+		t.Fatalf("hung attempt retried: %d calls, %v, %+v", *calls, err, resp)
+	}
+
+	// every attempt hangs: this item fails, the run goes on
+	srv, calls = hangingServer(t, 99)
+	p = testParser(newSDKClient("test", 200*time.Millisecond, option.WithBaseURL(srv.URL)))
+	_, err := p.Parse(context.Background(), req)
+	var perr *models.ParseError
+	if !errors.As(err, &perr) || *calls != retries+1 {
+		t.Fatalf("all attempts timed out: want the item's failure after %d calls, got %d, %v", retries+1, *calls, err)
+	}
+
+	// the run itself is out of time: not the item's fault, parsing stops
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	defer cancel()
+	_, err = p.Parse(ctx, req)
+	if err == nil || errors.As(err, &perr) {
+		t.Fatalf("run deadline: want a plain error, got %v", err)
+	}
+}

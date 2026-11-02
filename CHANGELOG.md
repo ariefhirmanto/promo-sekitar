@@ -29,6 +29,19 @@ A change can live in three places; roll back each one the change touched.
 
 ## Unreleased
 
+### Fix: one slow Claude reply stopped the whole parse run
+
+Found in the first parse dry run against the sheet (`context deadline exceeded`).
+
+Fixed
+- `Claude.TimeoutSeconds` (60) now applies to each attempt, so the SDK retries a reply that hangs
+  (2 retries, with backoff) instead of the first attempt using up the whole call.
+- A call that still times out after its retries is that item's failure (`failed`, tried again
+  next run), not the run's: the other items go on. Running out of the job's own 20 minutes still
+  stops parsing after writing what was done.
+
+Deploy: nothing; the next promo run uses it. Roll back: `git revert` this commit.
+
 ### Feed: undated promos leave after 30 days
 
 Changed
