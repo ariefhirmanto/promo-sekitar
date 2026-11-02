@@ -23,24 +23,36 @@ type usecase struct {
 	knownRefs    promo.RawItemRefReader
 	maxErrors    int
 	fetchTimeout time.Duration
+	parseDeps    *ParseDeps
 }
 
-// Promo Usecase constructor; adapters is the source-type registry, or a replay file.
+// Promo Usecase constructor; adapters is the source-type registry, or a replay file. parse nil
+// runs the fetch stage only.
 func NewPromoUsecase(sources promo.SourceReader, statuses promo.SourceStatusWriter, adapters promo.SourceAdapters,
-	rawItems promo.RawItemWriter, knownRefs promo.RawItemRefReader, maxErrors int, fetchTimeout time.Duration) *usecase {
+	rawItems promo.RawItemWriter, knownRefs promo.RawItemRefReader, maxErrors int, fetchTimeout time.Duration,
+	parse *ParseDeps) *usecase {
 	if maxErrors <= 0 {
 		maxErrors = 3
 	}
 	if fetchTimeout <= 0 {
 		fetchTimeout = 2 * time.Minute
 	}
+	if parse != nil {
+		if parse.Retries < 0 {
+			parse.Retries = 0
+		}
+		if parse.HideBelow <= 0 {
+			parse.HideBelow = 0.6
+		}
+	}
 	return &usecase{sources: sources, statuses: statuses, adapters: adapters, rawItems: rawItems,
-		knownRefs: knownRefs, maxErrors: maxErrors, fetchTimeout: fetchTimeout}
+		knownRefs: knownRefs, maxErrors: maxErrors, fetchTimeout: fetchTimeout, parseDeps: parse}
 }
 
-// RunSources fetches every due source, stores what it read as raw items, and writes each source's
-// status back. One source failing never stops the others; the run fails only when the sheet
-// can't be read or written, or every due source failed.
+// RunSources fetches every due source, stores what it read as raw items, writes each source's
+// status back, then parses the new items into promos. One source or item failing never stops the
+// others; the run fails only when the sheet can't be read or written, every due source failed,
+// or the parser can't work at all.
 func (u *usecase) RunSources(ctx context.Context, input promo.InputRun) (resp models.PromoRunResult, err error) {
 	err = input.ValidateInput()
 	if err != nil {
@@ -58,19 +70,40 @@ func (u *usecase) RunSources(ctx context.Context, input promo.InputRun) (resp mo
 	if err != nil {
 		return resp, errors.WithMessage(err, "promoUC.RunSources.DueSources")
 	}
+
+	var items []models.RawItem
 	if len(due) == 0 {
 		log.Println("[Promo][RunSources][Usecase] No source is due")
-		return resp, nil
+	} else {
+		resp, items, err = u.fetchSources(ctx, due, input)
+		if err != nil {
+			return resp, err
+		}
 	}
 
+	if u.parseDeps != nil {
+		resp.Parse, err = u.parse(ctx, sources, items, input.Now.In(models.WIB).Format("2006-01-02"))
+		if err != nil {
+			return resp, errors.WithMessage(err, "promoUC.RunSources")
+		}
+	}
+
+	if len(due) > 0 && resp.Failed() == len(due) {
+		return resp, fmt.Errorf("promoUC.RunSources: all %d due sources failed", len(due))
+	}
+	return resp, nil
+}
+
+// fetchSources runs the fetch stage: every due source's adapter, then the raw items and the
+// source statuses are written.
+func (u *usecase) fetchSources(ctx context.Context, due []models.Source, input promo.InputRun) (resp models.PromoRunResult, items []models.RawItem, err error) {
 	refs, err := u.knownRefs.GetRawItemRefs(ctx)
 	if err != nil {
 		log.Println("[Promo][RunSources][Usecase] Problem getting known refs, err: ", err.Error())
-		return resp, errors.WithMessage(err, "promoUC.RunSources.GetRawItemRefs")
+		return resp, nil, errors.WithMessage(err, "promoUC.RunSources.GetRawItemRefs")
 	}
 
 	now := input.Now.In(models.WIB).Format(models.TimeLayout)
-	var items []models.RawItem
 	var statuses []models.SourceStatus
 	for _, src := range due {
 		got, ferr := u.fetch(ctx, models.FetchRequest{Source: src, KnownRefs: toSet(refs[src.ID])})
@@ -100,20 +133,16 @@ func (u *usecase) RunSources(ctx context.Context, input promo.InputRun) (resp mo
 		resp.RawItems, err = u.rawItems.UpsertRawItems(ctx, items)
 		if err != nil {
 			log.Println("[Promo][RunSources][Usecase] Problem upserting raw items, err: ", err.Error())
-			return resp, errors.WithMessage(err, "promoUC.RunSources.UpsertRawItems")
+			return resp, nil, errors.WithMessage(err, "promoUC.RunSources.UpsertRawItems")
 		}
 	}
 
 	resp.Statuses, err = u.statuses.UpdateSources(ctx, statuses)
 	if err != nil {
 		log.Println("[Promo][RunSources][Usecase] Problem updating source statuses, err: ", err.Error())
-		return resp, errors.WithMessage(err, "promoUC.RunSources.UpdateSources")
+		return resp, nil, errors.WithMessage(err, "promoUC.RunSources.UpdateSources")
 	}
-
-	if resp.Failed() == len(due) {
-		return resp, fmt.Errorf("promoUC.RunSources: all %d due sources failed", len(due))
-	}
-	return resp, nil
+	return resp, items, nil
 }
 
 // fetch runs one source's adapter with its own timeout and checks what came back. Items whose ref

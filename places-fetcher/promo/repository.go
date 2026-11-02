@@ -30,6 +30,27 @@ type RawItemReader interface {
 	GetRawItems(ctx context.Context, status string) (resp []models.RawItem, err error)
 }
 
+// RawItemStatusWriter writes the parse stage's columns of raw items (sheet, or the log in dry-run mode).
+type RawItemStatusWriter interface {
+	UpdateRawItems(ctx context.Context, statuses []models.RawItemStatus) (resp models.WriteResult, err error)
+}
+
+// BrandReader reads the brands tab (sheet, or a JSON file), to resolve the brand a promo names.
+type BrandReader interface {
+	GetBrands(ctx context.Context) (resp []models.Brand, err error)
+}
+
+// OutletReader reads open outlets, to turn "Margo City" into out_* ids.
+type OutletReader interface {
+	GetOutlets(ctx context.Context) (resp []models.Outlet, err error)
+}
+
+// Parser reads promos out of one raw item (promo/parser/<model>). An item-level failure is a
+// *models.ParseError; any other error means the parser can't work this run.
+type Parser interface {
+	Parse(ctx context.Context, req models.ParseRequest) (resp models.ParseResult, err error)
+}
+
 // PromoRepository stores promos; only rows with source = web are ever changed.
 type PromoRepository interface {
 	UpsertPromos(ctx context.Context, promos []models.Promo) (resp models.WriteResult, err error)

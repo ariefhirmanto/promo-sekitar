@@ -69,24 +69,101 @@ type FetchResult struct {
 	LastSeenRef string    // newest ref, for adapters that page by it; empty keeps the old value
 }
 
+// The parse stage's columns of a raw_items row, sent to upsert_raw_items. Every field is always
+// sent, so a parse that works after a failed one clears the old error.
+type RawItemStatus struct {
+	ID       string   `json:"id"`
+	SourceID string   `json:"source_id"`
+	Status   string   `json:"status"` // parsed (promos found), skipped (none) or failed
+	Attempts int      `json:"attempts"`
+	Error    string   `json:"error"`
+	PromoIDs []string `json:"promo_ids"`
+}
+
 // A promo the job writes to the promos tab (source = web is set by the sheet).
 type Promo struct {
-	ID         string   `json:"id"` // promo_ + hash of DedupeKey
-	BrandID    string   `json:"brand_id"`
-	BrandText  string   `json:"brand_text"`
-	Title      string   `json:"title"`
-	Deal       string   `json:"deal"`
-	Channel    string   `json:"channel"` // dine_in, take_away, delivery or all
-	ValidFrom  string   `json:"valid_from"`
-	ValidUntil string   `json:"valid_until"`
-	PostedAt   string   `json:"posted_at"`
-	OutletIDs  []string `json:"outlet_ids"`
-	Status     string   `json:"status"` // active or hidden
-	ActionURL  string   `json:"action_url"`
-	SourceIDs  []string `json:"source_ids"`
-	SourceRefs []string `json:"source_refs"` // raw item ids it was read from
-	DedupeKey  string   `json:"dedupe_key"`
-	Confidence float64  `json:"confidence"`
+	ID             string   `json:"id"` // promo_ + hash of DedupeKey
+	BrandID        string   `json:"brand_id"`
+	BrandText      string   `json:"brand_text"`
+	Title          string   `json:"title"`
+	Deal           string   `json:"deal"`
+	Channel        string   `json:"channel"` // dine_in, take_away, delivery or all
+	ValidFrom      string   `json:"valid_from"`
+	ValidUntil     string   `json:"valid_until"`
+	PostedAt       string   `json:"posted_at"`
+	OutletIDs      []string `json:"outlet_ids"` // empty: every outlet of the brand
+	Status         string   `json:"status"`     // active or hidden
+	ActionURL      string   `json:"action_url"`
+	SourceIDs      []string `json:"source_ids"`
+	SourceRefs     []string `json:"source_refs"` // raw item ids it was read from
+	DedupeKey      string   `json:"dedupe_key"`
+	Confidence     float64  `json:"confidence"`
+	Recurrence     string   `json:"recurrence"`      // "setiap Jumat"; empty for every day
+	PaymentMethods []string `json:"payment_methods"` // e.g. "BCA credit card", "GoPay"
+}
+
+// What a parser gets for one raw item. Brand and Outlets are empty for an aggregator's item;
+// KnownBrands then lists the tracked brands the item may be about.
+type ParseRequest struct {
+	Item        RawItem
+	Today       string   // the run's date (YYYY-MM-DD, WIB), for "H+7" and "berlaku minggu ini"
+	Brand       string   // the source's brand name and aliases, "HokBen (Hoka Hoka Bento)"
+	Outlets     []string // that brand's outlet and mall names, sorted
+	KnownBrands []string // sorted; aggregators only
+}
+
+// One promo as the parser read it, before brand and outlet ids are resolved.
+type ParsedPromo struct {
+	IsDeal         bool // false for menu launches and news, which are dropped
+	BrandName      string
+	Title          string
+	Deal           string
+	Channel        string // dine_in, take_away, delivery or all
+	ValidFrom      string // YYYY-MM-DD or empty
+	ValidUntil     string // YYYY-MM-DD or empty (no end date)
+	Recurrence     string
+	OutletLimits   []OutletLimit // empty: every outlet
+	PaymentMethods []string
+	Category       string // food, drink or non_food
+	Confidence     float64
+}
+
+// A place a promo is limited to, as written in the post: a mall ("Margo City"), an outlet name,
+// a city ("Bekasi") or a format ("HokBen+").
+type OutletLimit struct {
+	Kind string // mall, outlet, city or format
+	Name string
+}
+
+// What a parser returns for one raw item.
+type ParseResult struct {
+	Promos          []ParsedPromo
+	CostUSD         float64 // every call made for the item, retries included
+	CacheReadTokens int64
+}
+
+// ParseError is a parser failure that belongs to the item (a reply that stays invalid, a refusal,
+// a cut-off reply): the item is marked failed and retried on later runs. Any other parser error
+// (auth, network, quota) stops the parse stage and leaves the items as they are.
+type ParseError struct {
+	Reason string
+}
+
+func (e *ParseError) Error() string { return e.Reason }
+
+// what the parse stage did in one run
+type ParseRunResult struct {
+	Items           int // raw items parsed (calls made)
+	Parsed          int // items with at least one promo
+	Skipped         int // items with no promo
+	Failed          int
+	Left            int // items not parsed because the budget ran out; next run continues
+	Promos          int // promos written (after merging)
+	Hidden          int // of those, saved as hidden
+	Dropped         int // read but not written: not a deal, or a brand that isn't tracked
+	CostUSD         float64
+	CacheReadTokens int64
+	Written         WriteResult
 }
 
 // response of a sheet write that adds or updates rows by id
@@ -112,6 +189,7 @@ type PromoRunResult struct {
 	Fetched  int         // raw items read from all sources
 	RawItems WriteResult
 	Statuses WriteResult
+	Parse    ParseRunResult
 }
 
 // Failed counts the due sources whose fetch failed.

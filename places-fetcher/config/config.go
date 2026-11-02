@@ -15,6 +15,8 @@ type MainConfig struct {
 	Outlet   OutletConfig
 	Promo    PromoConfig
 	WebPage  WebPageConfig
+	Parser   ParserConfig
+	Claude   ClaudeConfig
 }
 
 type PlacesConfig struct {
@@ -55,6 +57,25 @@ type WebPageConfig struct {
 	MaxNewItems    int `mapstructure:"MaxNewItems"`    // detail pages opened per source per run
 }
 
+// Settings of the promo job's parse stage; Name picks the adapter in promo/parser.
+type ParserConfig struct {
+	Name      string  `mapstructure:"Name"`      // registered parser, e.g. "claude"
+	Retries   int     `mapstructure:"Retries"`   // later runs that parse a failed item again
+	BudgetUSD float64 `mapstructure:"BudgetUSD"` // per run; the rest of the items wait for the next run
+	HideBelow float64 `mapstructure:"HideBelow"` // promos read with less confidence are saved hidden
+}
+
+// Settings of the claude parser adapter (promo/parser/claude). APIKey comes from ANTHROPIC_API_KEY.
+type ClaudeConfig struct {
+	APIKey           string  `mapstructure:"APIKey"`
+	Model            string  `mapstructure:"Model"`
+	Effort           string  `mapstructure:"Effort"` // low, medium, high
+	MaxTokens        int     `mapstructure:"MaxTokens"`
+	TimeoutSeconds   int     `mapstructure:"TimeoutSeconds"`
+	InputUSDPerMTok  float64 `mapstructure:"InputUSDPerMTok"`
+	OutputUSDPerMTok float64 `mapstructure:"OutputUSDPerMTok"`
+}
+
 // LoadConfig reads config.yaml; any key can be overridden by env, e.g. Sheet.Token → SHEET_TOKEN.
 func LoadConfig(path string) (config MainConfig) {
 	viper.AddConfigPath(path)
@@ -63,6 +84,7 @@ func LoadConfig(path string) (config MainConfig) {
 
 	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 	viper.AutomaticEnv()
+	exception.PanicIfNeeded(viper.BindEnv("Claude.APIKey", "ANTHROPIC_API_KEY")) // the SDK's usual name
 
 	err := viper.ReadInConfig()
 	exception.PanicIfNeeded(err)

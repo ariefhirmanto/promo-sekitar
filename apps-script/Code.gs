@@ -13,6 +13,7 @@
  *   GET  {WEB_APP_URL}?token=WRITE&mode=sources                   every source row
  *   GET  {WEB_APP_URL}?token=WRITE&mode=raw_items&status=failed   raw items with that status
  *   GET  {WEB_APP_URL}?token=WRITE&mode=raw_item_refs             stored refs per source, any status
+ *   GET  {WEB_APP_URL}?token=WRITE&mode=outlets                   open outlets, to match promo locations
  *   POST {WEB_APP_URL}?token=WRITE&mode=update_sources            fetcher status columns only
  *   POST {WEB_APP_URL}?token=WRITE&mode=upsert_raw_items          by id; prunes rows past 90 days
  *   POST {WEB_APP_URL}?token=WRITE&mode=upsert_promos             by id; source = web rows only
@@ -46,11 +47,12 @@ function doGet(e) {
     }) });
   }
 
-  if (p.mode === 'sources' || p.mode === 'raw_items' || p.mode === 'raw_item_refs') {
+  if (p.mode === 'sources' || p.mode === 'raw_items' || p.mode === 'raw_item_refs' || p.mode === 'outlets') {
     if (!authorized_(p, 'WRITE_TOKEN')) return json_({ ok: false, error: 'unauthorized' });
     try {
       if (p.mode === 'sources') return json_({ ok: true, sources: getSources_() });
       if (p.mode === 'raw_item_refs') return json_({ ok: true, refs: getRawItemRefs_() });
+      if (p.mode === 'outlets') return json_({ ok: true, outlets: getOpenOutlets_() });
       return json_({ ok: true, raw_items: getRawItems_(String(p.status || '')) });
     } catch (err) {
       return json_({ ok: false, error: String(err && err.message || err) });
@@ -189,12 +191,15 @@ const SOURCE_FETCHER_FIELDS = ['last_fetched_at', 'last_seen_ref', 'error_count'
 const RAW_ITEM_FIELDS = ['id', 'source_id', 'ref', 'url', 'posted_at', 'text', 'status', 'attempts', 'error',
   'promo_ids', 'fetched_at'];
 const RAW_ITEM_STATUSES = ['new', 'parsed', 'skipped', 'failed'];
-const RAW_TEXT_MAX = 2000;
+const RAW_TEXT_MAX = 6000;   // whole aggregator posts fit (they run up to ~6,000 characters)
 const RAW_KEEP_DAYS = 90;
 
 // promos: what the fetcher writes on a source = web row; source, first_seen_at and last_seen_at are set here.
 const PROMO_FIELDS = ['id', 'brand_id', 'brand_text', 'title', 'deal', 'channel', 'valid_from', 'valid_until',
-  'posted_at', 'outlet_ids', 'status', 'action_url', 'source_ids', 'source_refs', 'dedupe_key', 'confidence'];
+  'posted_at', 'outlet_ids', 'status', 'action_url', 'source_ids', 'source_refs', 'dedupe_key', 'confidence',
+  'recurrence', 'payment_methods'];
+// Lists that grow as more sources report the same promo: a write adds to them, never replaces them.
+const PROMO_MERGED_FIELDS = ['source_ids', 'source_refs'];
 const PROMO_SOURCE = 'web';
 
 // Launch sources from the promo fetcher RFC; setupPromoTabs() writes them only into an empty sources tab.
@@ -265,6 +270,22 @@ function getRawItems_(status) {
     });
 }
 
+// Open outlets with the fields the promo job matches locations against ("Margo City" → its out_ id).
+function getOpenOutlets_() {
+  return readTab_('outlets')
+    .filter(function (o) { return String(o.status || 'open').trim() === 'open'; })
+    .map(function (o) {
+      return {
+        id: String(o.id).trim(),
+        brand_id: String(o.brand_id || '').trim(),
+        name: String(o.name || ''),
+        address: String(o.address || ''),
+        mall_name: String(o.mall_name || ''),
+        format: String(o.format || '')
+      };
+    });
+}
+
 // { source_id: [ref, ...] } for every stored raw item, so an adapter only opens items it hasn't read.
 function getRawItemRefs_() {
   const refs = {};
@@ -318,7 +339,7 @@ function upsertRawItems_(incoming) {
 
 // Upserts by id. Only rows with source = web are the fetcher's: any other existing row (manual) is
 // skipped and never rewritten. status is whatever the fetcher computed, so a hand-hidden web promo
-// can come back; set its source to manual to keep it out.
+// can come back; set its source to manual to keep it out. source_ids and source_refs add to the row's.
 function upsertPromos_(incoming) {
   const t = openTab_('promos', PROMO_FIELDS.concat(['source', 'first_seen_at', 'last_seen_at']));
   const today = Utilities.formatDate(new Date(), TZ, 'yyyy-MM-dd');
@@ -342,7 +363,9 @@ function upsertPromos_(incoming) {
     }
     PROMO_FIELDS.forEach(function (f) {
       if (pr[f] === undefined) return;
-      row[t.col[f]] = Array.isArray(pr[f]) ? pr[f].join(',') : pr[f];
+      let v = pr[f];
+      if (PROMO_MERGED_FIELDS.indexOf(f) !== -1) v = mergeList_(row[t.col[f]], Array.isArray(v) ? v : [v]);
+      row[t.col[f]] = Array.isArray(v) ? v.join(',') : v;
     });
     row[t.col.source] = PROMO_SOURCE;
     row[t.col.last_seen_at] = today;
@@ -355,6 +378,16 @@ function upsertPromos_(incoming) {
     t.sheet.getRange(first + 2, 1, appended.length, t.header.length).setValues(t.rows.slice(first));
   }
   return { added: added, updated: updated, skipped: skipped };
+}
+
+// "a,b" + ['b', 'c'] → ['a', 'b', 'c']
+function mergeList_(cell, add) {
+  const out = [];
+  String(cell || '').split(',').concat(add.map(String)).forEach(function (v) {
+    v = v.trim();
+    if (v && out.indexOf(v) === -1) out.push(v);
+  });
+  return out;
 }
 
 /* Run once from the editor: adds the sources and raw_items tabs, the new promos columns, and the

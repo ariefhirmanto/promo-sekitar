@@ -109,7 +109,7 @@ func (m memRefs) GetRawItemRefs(ctx context.Context) (map[string][]string, error
 func run(t *testing.T, srcs memSources, a fakeAdapter, sourceID string) (models.PromoRunResult, error, *memStatuses, *memRaw) {
 	t.Helper()
 	st, raw := &memStatuses{}, &memRaw{}
-	uc := NewPromoUsecase(srcs, st, adapters{"web_page": a}, raw, memRefs{}, 3, time.Minute)
+	uc := NewPromoUsecase(srcs, st, adapters{"web_page": a}, raw, memRefs{}, 3, time.Minute, nil)
 	res, err := uc.RunSources(context.Background(), promo.InputRun{SourceID: sourceID, Now: now})
 	return res, err, st, raw
 }
@@ -209,7 +209,7 @@ func TestRunSourcesSheetWriteFailureLeavesStatusesAlone(t *testing.T) {
 	srcs := memSources{{ID: "src_a", Type: "web_page", Status: "active"}}
 	a := fakeAdapter{results: map[string]models.FetchResult{"src_a": {Items: []models.RawItem{{Ref: "1"}}}}}
 	st, raw := &memStatuses{}, &memRaw{err: errors.New("sheet: busy, retry later")}
-	uc := NewPromoUsecase(srcs, st, adapters{"web_page": a}, raw, memRefs{}, 3, time.Minute)
+	uc := NewPromoUsecase(srcs, st, adapters{"web_page": a}, raw, memRefs{}, 3, time.Minute, nil)
 	_, err := uc.RunSources(context.Background(), promo.InputRun{Now: now})
 	if err == nil || !strings.Contains(err.Error(), "UpsertRawItems") {
 		t.Fatalf("want the raw items error, got %v", err)
@@ -227,7 +227,7 @@ func TestRunSourcesPassesAndEnforcesKnownRefs(t *testing.T) {
 		got:     map[string]models.FetchRequest{},
 	}
 	st, raw := &memStatuses{}, &memRaw{}
-	uc := NewPromoUsecase(srcs, st, adapters{"web_page": a}, raw, memRefs{"src_a": {"old"}, "src_b": {"x"}}, 3, time.Minute)
+	uc := NewPromoUsecase(srcs, st, adapters{"web_page": a}, raw, memRefs{"src_a": {"old"}, "src_b": {"x"}}, 3, time.Minute, nil)
 	res, err := uc.RunSources(context.Background(), promo.InputRun{Now: now})
 	if err != nil {
 		t.Fatal(err)
@@ -249,7 +249,7 @@ func TestRunSourcesNothingDue(t *testing.T) {
 }
 
 func TestRunSourcesValidatesInput(t *testing.T) {
-	uc := NewPromoUsecase(memSources{}, &memStatuses{}, adapters{}, &memRaw{}, memRefs{}, 3, time.Minute)
+	uc := NewPromoUsecase(memSources{}, &memStatuses{}, adapters{}, &memRaw{}, memRefs{}, 3, time.Minute, nil)
 	if _, err := uc.RunSources(context.Background(), promo.InputRun{}); err == nil {
 		t.Fatal("a zero clock must be rejected")
 	}

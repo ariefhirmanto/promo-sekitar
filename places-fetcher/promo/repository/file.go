@@ -44,6 +44,85 @@ func (noRefs) GetRawItemRefs(ctx context.Context) (resp map[string][]string, err
 	return map[string][]string{}, nil
 }
 
+// GetRawItems: there are no stored items, so only this run's items are parsed.
+func (noRefs) GetRawItems(ctx context.Context, status string) (resp []models.RawItem, err error) {
+	return nil, nil
+}
+
+// outletFileRepository reads outlets from a JSON file (the GET mode=outlets shape); no file means
+// no outlets, so every promo limited to a place is saved hidden.
+type outletFileRepository struct {
+	path string
+}
+
+func NewOutletFileRepository(path string) *outletFileRepository {
+	return &outletFileRepository{path: path}
+}
+
+func (r *outletFileRepository) GetOutlets(ctx context.Context) (resp []models.Outlet, err error) {
+	if r.path == "" {
+		return nil, nil
+	}
+	b, err := os.ReadFile(r.path)
+	if err != nil {
+		log.Println("[Promo][GetOutlets][Repository] Problem reading outlets file, err: ", err.Error())
+		return resp, err
+	}
+	err = json.Unmarshal(b, &resp)
+	return resp, errors.Wrap(err, "outletFileRepository.GetOutlets.json.Unmarshal")
+}
+
+// logRawStatusWriter prints the raw item statuses a live run would write (dry-run mode).
+type logRawStatusWriter struct{}
+
+func NewLogRawStatusWriter() *logRawStatusWriter {
+	return &logRawStatusWriter{}
+}
+
+func (logRawStatusWriter) UpdateRawItems(ctx context.Context, statuses []models.RawItemStatus) (resp models.WriteResult, err error) {
+	for _, s := range statuses {
+		log.Printf("[Promo][UpdateRawItems][Repository] would set %s: status=%s attempts=%d promo_ids=%q error=%q",
+			s.ID, s.Status, s.Attempts, strings.Join(s.PromoIDs, ","), s.Error)
+	}
+	return models.WriteResult{Updated: len(statuses)}, nil
+}
+
+// promoCSVRepository writes promos to a CSV with the promos tab's fetcher columns (dry-run mode).
+type promoCSVRepository struct {
+	path string
+}
+
+func NewPromoCSVRepository(path string) *promoCSVRepository {
+	return &promoCSVRepository{path: path}
+}
+
+func (r *promoCSVRepository) UpsertPromos(ctx context.Context, promos []models.Promo) (resp models.WriteResult, err error) {
+	f, err := os.Create(r.path)
+	if err != nil {
+		log.Println("[Promo][UpsertPromos][Repository] Problem creating CSV, err: ", err.Error())
+		return resp, err
+	}
+	defer f.Close()
+
+	w := csv.NewWriter(f)
+	w.Write([]string{"id", "brand_id", "brand_text", "title", "deal", "channel", "valid_from", "valid_until",
+		"posted_at", "outlet_ids", "status", "action_url", "source_ids", "source_refs", "dedupe_key", "confidence",
+		"recurrence", "payment_methods"})
+	for _, p := range promos {
+		w.Write([]string{p.ID, p.BrandID, p.BrandText, p.Title, p.Deal, p.Channel, p.ValidFrom, p.ValidUntil,
+			p.PostedAt, strings.Join(p.OutletIDs, ","), p.Status, p.ActionURL, strings.Join(p.SourceIDs, ","),
+			strings.Join(p.SourceRefs, ","), p.DedupeKey, strconv.FormatFloat(p.Confidence, 'f', 2, 64),
+			p.Recurrence, strings.Join(p.PaymentMethods, ",")})
+	}
+	w.Flush()
+	if err = w.Error(); err != nil {
+		return resp, err
+	}
+
+	log.Printf("[Promo][UpsertPromos][Repository] Wrote %d promos to %s", len(promos), r.path)
+	return models.WriteResult{Added: len(promos)}, nil
+}
+
 // logStatusWriter prints the source statuses a live run would write (dry-run mode).
 type logStatusWriter struct{}
 

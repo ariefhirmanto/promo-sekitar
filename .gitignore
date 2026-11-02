@@ -20,6 +20,7 @@ token*.json
 # --- Fetcher output ---
 places-fetcher/outlets*.csv
 places-fetcher/raw_items*.csv
+places-fetcher/promos*.csv
 places-fetcher/*.raw.json
 
 # --- Live page captures: never committed (see .claude/rules/adapters.md) ---

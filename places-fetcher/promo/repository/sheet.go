@@ -79,6 +79,26 @@ func (r *sheetRepository) GetRawItems(ctx context.Context, status string) (resp 
 	return resp, nil
 }
 
+// UpdateRawItems writes the parse stage's columns through the same upsert; the read columns stay.
+func (r *sheetRepository) UpdateRawItems(ctx context.Context, statuses []models.RawItemStatus) (resp models.WriteResult, err error) {
+	if err = r.client.Post(ctx, "upsert_raw_items", map[string]interface{}{"raw_items": statuses}, &resp); err != nil {
+		log.Println("[Promo][UpdateRawItems][Repository] Problem writing raw item statuses, err: ", err.Error())
+		return resp, errors.Wrap(hint(err), "sheetRepository.UpdateRawItems")
+	}
+	return resp, nil
+}
+
+func (r *sheetRepository) GetOutlets(ctx context.Context) (resp []models.Outlet, err error) {
+	var body struct {
+		Outlets []models.Outlet `json:"outlets"`
+	}
+	if err = r.client.Get(ctx, "outlets", nil, &body); err != nil {
+		log.Println("[Promo][GetOutlets][Repository] Problem reading outlets, err: ", err.Error())
+		return resp, errors.Wrap(hint(err), "sheetRepository.GetOutlets")
+	}
+	return body.Outlets, nil
+}
+
 func (r *sheetRepository) UpsertPromos(ctx context.Context, promos []models.Promo) (resp models.WriteResult, err error) {
 	if err = r.client.Post(ctx, "upsert_promos", map[string]interface{}{"promos": promos}, &resp); err != nil {
 		log.Println("[Promo][UpsertPromos][Repository] Problem writing promos, err: ", err.Error())

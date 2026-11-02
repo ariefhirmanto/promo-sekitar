@@ -90,7 +90,7 @@ test('upsert_raw_items adds, updates, defaults status and fetched_at, and caps t
   assert.deepEqual(res, { ok: true, added: 1, updated: 0, pruned: 0 });
   let [item] = s.ss.getSheetByName('raw_items').objects();
   assert.equal(item.status, 'new');
-  assert.equal(item.text.length, 2000);
+  assert.equal(item.text.length, 5000, 'text up to 6,000 characters is kept whole');
   assert.match(item.fetched_at, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\+07:00$/);
 
   res = s.post('upsert_raw_items', { raw_items: [
@@ -102,6 +102,26 @@ test('upsert_raw_items adds, updates, defaults status and fetched_at, and caps t
   assert.equal(item.status, 'parsed');
   assert.equal(item.promo_ids, 'promo_a,promo_b');
   assert.equal(item.url, 'https://aggregator.example/promo-es-krim-rp5000/', 'fields not sent are kept');
+});
+
+test('upsert_raw_items caps text at 6,000 characters', () => {
+  const s = loadCode(tabs());
+  s.post('upsert_raw_items', { raw_items: [{ id: 'src_a:1', source_id: 'src_a', ref: '1', text: 'y'.repeat(9000) }] });
+  assert.equal(s.ss.getSheetByName('raw_items').objects()[0].text.length, 6000);
+});
+
+test('GET outlets returns open outlets only, with the fields used for matching', () => {
+  const s = loadCode(tabs({ outlets: [['id', 'brand_id', 'name', 'address', 'mall_name', 'format', 'status', 'h3_r8'],
+    ['out_osm_n1', 'brand_ramenya', 'RamenYa Margo', 'Jl. Margonda', 'Margo City', 'Ramen Ya', 'open', '88658c1a9bfffff'],
+    ['out_osm_n2', 'brand_ramenya', 'RamenYa Old', '', '', 'Ramen Ya', 'closed', '88658c1a9bfffff'],
+    ['out_manual_1', 'brand_hokben', 'HokBen Kokas', '', 'Kota Kasablanka', 'HokBen', '', ''],
+  ] }));
+  const res = s.get({ mode: 'outlets', token: 'w' });
+  assert.equal(res.ok, true);
+  assert.deepEqual(res.outlets.map((o) => o.id), ['out_osm_n1', 'out_manual_1'], 'closed outlets are left out; empty status means open');
+  assert.deepEqual({ ...res.outlets[0] }, { id: 'out_osm_n1', brand_id: 'brand_ramenya', name: 'RamenYa Margo',
+    address: 'Jl. Margonda', mall_name: 'Margo City', format: 'Ramen Ya' });
+  assert.equal(s.get({ mode: 'outlets', token: 'r' }).error, 'unauthorized');
 });
 
 test('upsert_raw_items prunes rows fetched more than 90 days ago', () => {
@@ -197,6 +217,22 @@ test('upsert_promos never rewrites a manual row, and updates web rows in place',
   assert.equal(web.title, 'Bundle Deals', 'fields not sent are kept');
   assert.equal(web.first_seen_at, '2026-10-20', 'first_seen_at never moves');
   assert.ok(!sheet.writes.some((w) => w.row <= 2 && w.row + w.numRows - 1 >= 2), 'the manual row (sheet row 2) was written');
+});
+
+test('upsert_promos adds source_ids and source_refs to the row, and writes the M4 columns', () => {
+  const s = loadCode(tabs({ promos: [PROMO_HEADER.concat(['source_ids', 'source_refs', 'first_seen_at', 'last_seen_at']),
+    ['promo_a1b2', 'brand_ramenya', '', 'Diskon 50%', '50%', 'all', '', '', '', '', 'active', '', 'web',
+      'src_ramenya_katalog', 'src_ramenya_katalog:1001', '2026-10-20', '2026-10-20'],
+  ] }));
+  s.post('upsert_promos', { promos: [{ id: 'promo_a1b2', status: 'active',
+    source_ids: ['src_bca_fnb', 'src_ramenya_katalog'], source_refs: ['src_bca_fnb:9f3a'],
+    recurrence: 'setiap Jumat', payment_methods: ['Kartu Kredit BCA', 'QRIS'] }] });
+  const [pr] = s.ss.getSheetByName('promos').objects();
+  assert.equal(pr.source_ids, 'src_ramenya_katalog,src_bca_fnb', 'a second source adds to the list, no duplicates');
+  assert.equal(pr.source_refs, 'src_ramenya_katalog:1001,src_bca_fnb:9f3a');
+  assert.equal(pr.recurrence, 'setiap Jumat');
+  assert.equal(pr.payment_methods, 'Kartu Kredit BCA,QRIS');
+  assert.equal(pr.status, 'active');
 });
 
 test('upsert_promos rejects ids that are not promo_ ids', () => {

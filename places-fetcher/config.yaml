@@ -34,3 +34,20 @@ WebPage:
   Retries: 2
   HostDelayMs: 1000   # 1 request a second per host
   MaxNewItems: 25     # detail pages opened per source per run; the rest wait for the next run
+
+# Parse stage of the promo job: raw items → promos.
+Parser:
+  Name: "claude"      # which adapter in promo/parser runs
+  Retries: 3          # a failed item is parsed again on the next 3 runs
+  BudgetUSD: 0.50     # per run, at the prices below; the rest waits for the next run
+  HideBelow: 0.6      # promos read with less confidence are saved hidden
+
+# Settings for the claude parser adapter. Keep APIKey empty; set ANTHROPIC_API_KEY in the environment.
+Claude:
+  APIKey: ""
+  Model: "claude-haiku-5-5"
+  Effort: "low"             # extraction needs no more; thinking is billed as output
+  MaxTokens: 4096
+  TimeoutSeconds: 60
+  InputUSDPerMTok: 0.10     # claude-haiku-5-5 list prices, for the budget
+  OutputUSDPerMTok: 0.50

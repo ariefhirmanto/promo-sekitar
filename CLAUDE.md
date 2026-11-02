@@ -20,7 +20,7 @@ fetcher writes.
 
 ## Rules
 
-- Run Go commands in WSL from `~/promo/places-fetcher` (Go 1.22 + gcc live there, not on Windows).
+- Run Go commands in WSL from `~/promo/places-fetcher` (Go 1.24 + gcc live there, not on Windows).
   Before finishing a change: `gofmt -l .`, `go vet ./...`, `go test ./...`.
 - `web/`: Node 22 from nvm in WSL (`. ~/.nvm/nvm.sh` first in non-interactive shells). Before
   finishing: `npm test`, `npx eslint .`, `npx tsc --noEmit`, `npx next build`. The browser only
@@ -34,7 +34,9 @@ fetcher writes.
   katalogpromosi.com), whether pasted by hand or written by a promo fetcher; `action_url` keeps
   the page. A Go promo feeder writes `web` and, like the outlets upsert, only touches `web` rows.
   `outlets.source` stays the data owner (`osm`): it is part of the outlet ids.
-- Secrets (`SHEET_URL`, `SHEET_TOKEN`, vendor keys) come from env / GitHub secrets, never files.
+- Secrets (`SHEET_URL`, `SHEET_TOKEN`, `ANTHROPIC_API_KEY`, vendor keys) come from env / GitHub
+  secrets, never files. A promo `-dry-run` still calls the parser (it costs a little); add
+  `-parse=false` to only fetch.
 - Never commit copies of third-party pages (HTML, JSON, text, or summaries of them) as testdata;
   test pages are hand-written HTML in `testdata/webpage/` with an invented brand, and live captures stay in gitignored
   `places-fetcher/testdata/live/`. Details: rule 12 in `.claude/rules/adapters.md`.

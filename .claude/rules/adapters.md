@@ -84,6 +84,11 @@ testdata/webpage/<host>_<what>.html hand-written test pages, invented brand and 
 testdata/live/                      gitignored live captures for local checks
 ```
 
+Promo parsers share everything that isn't the service: `promo/parser/prompt` holds the
+instructions, schema, request blocks, reply checks (`Read`) and retry loop (`Run`). A parser
+package only calls its service (`query.go` lays the blocks out for it), maps the reply to text,
+and prices the call; never copy the prompt or the checks into it.
+
 ## Done when
 
 - Tests cover: registration through the registry, the transform of a small inline response

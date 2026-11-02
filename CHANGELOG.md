@@ -12,6 +12,7 @@ branch: one commit and one tag per milestone, so any milestone can be rolled bac
 | `promo-m1` | M1: sheet tabs and Code.gs endpoints |
 | `promo-m2` | M2: promo job skeleton in Go (no source types yet) |
 | `promo-m3` | M3: `web_page` source type; Code.gs `raw_item_refs` |
+| `promo-m4` | M4 + M5: Claude Haiku parser, merge and promo upsert; `promos_daily` workflow (disabled); Go 1.24 |
 
 A change can live in three places; roll back each one the change touched.
 
@@ -26,6 +27,58 @@ A change can live in three places; roll back each one the change touched.
   Only delete them if you want them gone, and never rename existing tabs or headers.
 
 ## Unreleased
+
+### Promo fetcher M4 + M5: parser, merge and upsert (tag `promo-m4`)
+
+Built as one milestone (decided 2 Nov 2026).
+
+Added
+- Parse stage after fetching: this run's new items, stored `new` items, and `failed` items with
+  retries left are read into promos and upserted to `promos` (`source = web`). Raw items get
+  `parsed` / `skipped` / `failed` with `attempts`, `error` and `promo_ids`.
+- `promo.Parser` port and the parser registry (`promo/parser`, `Register` / `New` / `Names`);
+  `Parser.Name` picks the parser and `-parser` overrides it for a run. `promo/parser/prompt`
+  holds what every parser shares (instructions, schema, request blocks, reply checks, the
+  one-retry loop), so a new provider is a thin package and switching is a config change.
+  `promo/parser/claude` on the official Go SDK (`anthropic-sdk-go` v1.84.0): `claude-haiku-5-5`,
+  effort low, structured outputs, one retry with the problems, refusal / `max_tokens` / 400 as
+  item failures, prompt cache marker after the brand block, cost per call.
+- Hidden rules: confidence under 0.6, `non_food`, or an outlet limit that matches no outlet.
+  Menu launches (`is_deal` false) and aggregator promos for untracked brands are dropped.
+- Dedupe key (brand, the deal's numbers, dates, outlets) → `promo_` id; the same promo from
+  several items or sources is merged.
+- `Parser:` and `Claude:` sections in `config.yaml` (`BudgetUSD` 0.50 per run, `Retries` 3,
+  `HideBelow` 0.6, prices for the budget). `Claude.APIKey` reads `ANTHROPIC_API_KEY`.
+- Flags: `-parse` (default true), `-parser`, `-promos-csv`, `-brands-file`, `-outlets-file`.
+- `match/`: brand alias matching moved out of `outlet/usecase`, now shared by both jobs.
+- Code.gs `GET mode=outlets` (open outlets for location matching); `promos` columns
+  `recurrence` and `payment_methods`; `upsert_promos` adds to `source_ids` and `source_refs`
+  instead of replacing them. `raw_items` text cap raised from 2,000 to 6,000 characters.
+- `.github/workflows/promos_daily.yml`, committed disabled: the 23:00 UTC schedule is commented
+  out; Run workflow starts it by hand, as a dry run by default.
+- Golden-set test behind `-tags golden`, reading the gitignored `testdata/live/golden/`; it runs
+  any registered parser (`PARSER=<name>`), to compare providers.
+- 20 Go tests (parse stage 10, shared prompt 4, Claude adapter 6 with the registry) and 3 Code.gs tests.
+
+Changed
+- Go 1.24 (the SDK needs it): `go.mod`, both workflows, CLAUDE.md. Install it in WSL from go.dev.
+- `NewPromoUsecase` takes `*usecase.ParseDeps` (nil = fetch only). With no source due, a run
+  still parses stored items.
+
+Checked (dry run, nothing written): the replay fixture through a local stand-in for the Messages
+API: 5 items, 5 promos, 1 hidden for low confidence, cache marker sent on every call. Not yet run
+against the live API: no `ANTHROPIC_API_KEY` in WSL, and the golden set isn't written yet.
+
+Deploy
+1. Paste `apps-script/Code.gs` into the Apps Script editor and save; run `setupPromoTabs` once to
+   add the two new `promos` columns.
+2. Deploy → Manage deployments → edit → Version: New version → Deploy.
+3. Add the `ANTHROPIC_API_KEY` repo secret. Run `promos_daily` by hand (dry run) and check the
+   log, then uncomment its schedule.
+
+Roll back: `git revert promo-m4`; in Apps Script, redeploy the previous version. Promos written by
+M4 stay in the sheet (`source = web`); hide or delete them by hand if wanted. The two new columns
+can stay.
 
 ### Promo fetcher M3: `web_page` source type (tag `promo-m3`)
 

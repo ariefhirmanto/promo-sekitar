@@ -1,0 +1,44 @@
+name: promos_daily
+
+# Committed disabled: the schedule is commented out until a clean dry run, and until the
+# SHEET_URL, SHEET_TOKEN and ANTHROPIC_API_KEY secrets are set. Enable by uncommenting it.
+on:
+  # schedule:
+  #   - cron: "0 23 * * *"   # 23:00 UTC = 06:00 WIB, every day
+  workflow_dispatch:
+    inputs:
+      source:
+        description: "Run only this source id (e.g. src_bca_fnb), due or not; empty = every due source"
+        required: false
+        default: ""
+      dry_run:
+        description: "Dry run: read the sheet and call the parser, write nothing to the sheet"
+        type: boolean
+        default: true
+
+jobs:
+  promos:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: places-fetcher
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.24"
+      - run: go mod tidy
+      - run: go test ./...
+      - name: Run the promo job
+        run: |
+          args=()
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            [ "${{ inputs.dry_run }}" = "true" ] && args+=(-dry-run)
+            [ -n "${{ inputs.source }}" ] && args+=(-source "${{ inputs.source }}")
+          fi
+          go run ./app/promos "${args[@]}"
+        env:
+          SHEET_URL: ${{ secrets.SHEET_URL }}
+          SHEET_TOKEN: ${{ secrets.SHEET_TOKEN }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
