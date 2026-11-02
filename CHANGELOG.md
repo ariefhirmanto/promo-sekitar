@@ -29,6 +29,16 @@ A change can live in three places; roll back each one the change touched.
 
 ## Unreleased
 
+### Feed: undated promos leave after 30 days
+
+Changed
+- `Code.gs` feed: a promo without `valid_until` is shown for `UNDATED_KEEP_DAYS` (30) after its
+  `posted_at`, instead of forever. Its row stays in the sheet. Promos without `posted_at` (manual
+  rows, mostly) are kept as before; expired promos were already dropped.
+
+Deploy: paste `apps-script/Code.gs` into Apps Script and deploy a new version (Deploy → Manage
+deployments → edit → New version). Roll back: `git revert` this commit and deploy again.
+
 ### Fix: promo outlet limits matched outlets they don't name
 
 Found in a local parse dry run of the HokBen katalogpromosi page with outlets.

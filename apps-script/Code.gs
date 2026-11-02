@@ -35,6 +35,7 @@
 
 const TZ = 'Asia/Jakarta';
 const CACHE_SECONDS = 300;      // re-read the sheet at most every 5 minutes
+const UNDATED_KEEP_DAYS = 30;   // a promo without valid_until leaves the feed this long after posted_at
 const MAX_LIMIT = 50;
 
 function doGet(e) {
@@ -559,7 +560,9 @@ function loadData_() {
   const hit = cache.get('mdm_data');
   if (hit) return JSON.parse(hit);
 
-  const today = Utilities.formatDate(new Date(), TZ, 'yyyy-MM-dd');
+  const now = new Date();
+  const today = Utilities.formatDate(now, TZ, 'yyyy-MM-dd');
+  const undatedSince = Utilities.formatDate(new Date(now.getTime() - UNDATED_KEEP_DAYS * 86400000), TZ, 'yyyy-MM-dd');
   const brands = readTab_('brands');
   const outlets = readTab_('outlets').map(function (o) {
     o.h3_r8 = String(o.h3_r8 || '').trim().toLowerCase();
@@ -576,7 +579,8 @@ function loadData_() {
     })
     .filter(function (pr) {
       if (String(pr.status || 'active') !== 'active') return false;
-      return !pr.valid_until || pr.valid_until >= today;   // keep current and upcoming promos
+      if (pr.valid_until) return pr.valid_until >= today;   // keep current and upcoming promos
+      return !pr.posted_at || pr.posted_at >= undatedSince; // no end date: shown for UNDATED_KEEP_DAYS
     });
 
   const brandsById = {};

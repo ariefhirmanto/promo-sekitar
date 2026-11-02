@@ -271,3 +271,18 @@ test('existing calls still work: brands, feed, upsert_outlets', () => {
   const res = s.post('upsert_outlets', { source: 'osm', outlets: [{ id: 'out_osm_n1', brand_id: 'brand_ramenya', name: 'RamenYa Margo' }] });
   assert.deepEqual(res, { ok: true, added: 0, updated: 1, closed: 0 });
 });
+
+test('the feed drops expired promos, and undated ones posted more than 30 days ago', () => {
+  const day = (n) => iso(n * DAY).slice(0, 10);
+  const row = (id, validUntil, postedAt) => [id, 'brand_ramenya', '', id, 'Cek syarat', 'dine_in', '', validUntil, postedAt, '', 'active', 'https://example.com/', 'web'];
+  const s = loadCode(tabs({
+    promos: [PROMO_HEADER,
+      row('promo_current', day(-5), day(40)),
+      row('promo_expired', day(1), day(10)),
+      row('promo_undated_new', '', day(29)),
+      row('promo_undated_old', '', day(31)),
+      row('promo_undated_no_post', '', '')],
+  }));
+  const ids = s.ctx.loadData_().promos.map((p) => p.id);
+  assert.deepEqual(ids, ['promo_current', 'promo_undated_new', 'promo_undated_no_post']);
+});
