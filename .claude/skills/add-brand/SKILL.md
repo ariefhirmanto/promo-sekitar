@@ -20,7 +20,8 @@ Ask only for what's missing:
 - Other spellings and names: shortened forms, old names, sub-brands / formats
   (e.g. `HokBen+`, `HokBen 24 Jam`, old name `Hoka Hoka Bento`).
 - Watchlist or not (`is_watchlist`: 1 shows a ★ in the app).
-- Its Instagram handle, if promos should be fetched later (record it for the promo fetcher).
+- Pages with its promos (its katalogpromosi.com or giladiskon.com page, its own promo page), so
+  the promo fetcher can read them: add them after the brand with the `add-promo-source` skill.
 
 ## 2. Write the row
 
@@ -33,7 +34,8 @@ Columns: `id | name | aliases | is_watchlist`
 | `aliases` | Comma-separated. Include every spelling that appears in place names; punctuation and spacing don't matter (`Ramen-Ya` = `Ramen Ya` = `RamenYa`). |
 | `is_watchlist` | `1` or `0`. |
 
-How the matcher uses aliases (`outlet/usecase/matcher.go`):
+How the matcher uses aliases (`match/match.go`, shared by the places job and the promo job,
+which matches the brand an aggregator's promo names the same way):
 
 - Names are compacted (lowercase, letters/digits only, `+` → `plus`) and matched as substrings,
   longest alias wins.

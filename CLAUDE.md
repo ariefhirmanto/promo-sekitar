@@ -1,13 +1,21 @@
 # MakanDiMana
 
 Food promo app MVP. Google Sheets is the database: tabs `brands` (edited by hand), `outlets`
-(places fetcher), `promos` (promo fetcher). `apps-script/Code.gs` serves the feed and accepts
+(places fetcher), `promos` (promo fetcher), `sources` (edited by hand, status columns by the
+promo fetcher) and `raw_items` (promo fetcher). `apps-script/Code.gs` serves the feed and accepts
 fetcher writes.
 
 - `places-fetcher/`: Go, clean architecture after github.com/ariefhirmanto/go-clean-rest
-  (models → domain interfaces → repository / usecase / controller, wired in `job/app.go`).
-  Places vendors are adapters under `outlet/provider/<vendor>`.
-- `.github/workflows/places_refresh.yml`: runs the fetcher on the 2nd and 16th, 03:00 WIB.
+  (models → domain interfaces → repository / usecase / controller, wired in `job/`). Two jobs:
+  - places (`go run ./app`): outlets from OpenStreetMap; vendors are adapters under
+    `outlet/provider/<vendor>`.
+  - promos (`go run ./app/promos`): reads the `sources` rows, stores what it read in `raw_items`,
+    parses new items into `promos` with Claude Haiku. Source types are adapters under
+    `promo/source/<type>`, parsers under `promo/parser/<name>` (shared prompt in
+    `promo/parser/prompt`). Design: the promo fetcher RFC (linked in `CHANGELOG.md`).
+- `.github/workflows/places_refresh.yml`: runs the places job on the 2nd and 16th, 03:00 WIB.
+- `.github/workflows/promos_daily.yml`: the promo job, 06:00 WIB daily once its schedule is
+  uncommented; until then, by hand (dry run by default).
 - `web/`: Next.js 16 app (App Router, Cache Components). Read `web/AGENTS.md` and the docs in
   `web/node_modules/next/dist/docs/` before changing it: APIs differ from older Next.js.
 
@@ -15,6 +23,11 @@ fetcher writes.
 
 - Adding or fixing a brand: use the `add-brand` skill.
 - Adding or switching a places API: use the `add-places-provider` skill.
+- Adding, pausing or fixing a promo page: use the `add-promo-source` skill.
+- A site the promo fetcher can't read well, or a source that isn't a web page: use the
+  `add-source-type` skill.
+- Adding or switching a parser (another model or provider): the steps in
+  `places-fetcher/promo/parser/parser.go`; switching between registered ones is `Parser.Name`.
 - Go layering and adapter contracts: `.claude/rules/clean-architecture.md` and
   `.claude/rules/adapters.md` (they load automatically for files under `places-fetcher/`).
 
@@ -30,6 +43,12 @@ fetcher writes.
 - Never change sheet tab names, header names, or existing ids (`brand_*`, `out_*`): Code.gs and
   promos depend on them. New columns are fine; Code.gs reads by header name.
 - Rows with `source = manual` belong to the user; code must never update or close them.
+- `sources` rows belong to the user except `last_fetched_at`, `last_seen_ref`, `error_count`,
+  `last_error`, and `status` from `active` to `error`. Never rename a `src_*` id: raw item ids are
+  `<source id>:<ref>` and promos list it in `source_ids`. `raw_items` is the fetcher's own tab.
+- Promo parsing costs money: one parser call per new item, capped by `Parser.BudgetUSD` per run.
+  Item refs must stay stable across runs (a changing ref means a new call every run), and the
+  prompt stays in `promo/parser/prompt`, never copied into a parser.
 - `promos.source` is `web` for anything taken from a web page (bank promo pages, aggregators like
   katalogpromosi.com), whether pasted by hand or written by a promo fetcher; `action_url` keeps
   the page. A Go promo feeder writes `web` and, like the outlets upsert, only touches `web` rows.

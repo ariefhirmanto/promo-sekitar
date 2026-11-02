@@ -13,6 +13,7 @@ branch: one commit and one tag per milestone, so any milestone can be rolled bac
 | `promo-m2` | M2: promo job skeleton in Go (no source types yet) |
 | `promo-m3` | M3: `web_page` source type; Code.gs `raw_item_refs` |
 | `promo-m4` | M4 + M5: Claude Haiku parser, merge and promo upsert; `promos_daily` workflow (disabled); Go 1.24 |
+| `promo-m6` | M6: `add-promo-source` and `add-source-type` skills; promo rules in CLAUDE.md |
 
 A change can live in three places; roll back each one the change touched.
 
@@ -27,6 +28,26 @@ A change can live in three places; roll back each one the change touched.
   Only delete them if you want them gone, and never rename existing tabs or headers.
 
 ## Unreleased
+
+### Promo fetcher M6: rules and skills (tag `promo-m6`)
+
+Added
+- `.claude/skills/add-promo-source`: a `sources` row, step by step, with a fetch-only dry run
+  (item count, clean text, `posted_at`, refs that stay the same on a second run) and a parse dry
+  run (promos, hidden and dropped, with the cost), then the row to paste.
+- `.claude/skills/add-source-type`: when a site needs code, either a host rule in `web_page` or a
+  new source type under `promo/source/<type>`, with the rules every source follows (stable refs,
+  skip stored items, clean text, fail loudly, hand-written test pages) and the checks.
+
+Changed
+- CLAUDE.md: the promo job, its tabs and workflow in the overview; the new skills and the parser
+  steps under Workflows; rules for `sources` ownership, `src_*` ids, `raw_items`, and parse cost.
+- `add-brand` skill: points to the shared `match/` matcher, and to `add-promo-source` for the
+  brand's promo pages (instead of noting an Instagram handle).
+
+Deploy: nothing. No code, Code.gs or workflow change.
+
+Roll back: `git revert promo-m6`.
 
 ### Promo fetcher M4 + M5: parser, merge and upsert (tag `promo-m4`)
 
