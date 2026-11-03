@@ -185,6 +185,9 @@ Resolving and writing:
   source whose brand isn't in `brands` yet is marked `failed` without a call or an attempt.
 - Outlets: `outlet_limits` (mall, outlet, city, format) are matched against the brand's open
   outlets (`GET mode=outlets`); empty means every outlet.
+- Dropped, never written: a promo without `valid_until` ("while stocks last", standing or weekly
+  offers with no end date). Aggregators keep ended deals for years, and nothing tells when an
+  undated one stops. Add a standing offer by hand (`source = manual`) to show it.
 - Saved `hidden`: confidence under `Parser.HideBelow` (0.6), `non_food`, or a place that matches
   no outlet. Flip them to `active` by hand (and set `source = manual` to keep that).
 - `dedupe_key` = brand | the deal's numbers (else its compact text) | valid_from | valid_until |

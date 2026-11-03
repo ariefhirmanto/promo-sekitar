@@ -230,9 +230,11 @@ func (r *parseRun) item(ctx context.Context, it models.RawItem) error {
 }
 
 // promo resolves a parsed promo's brand and outlets and decides whether it is shown. ok is false
-// for what is never written: not a deal, or an aggregator's promo for a brand that isn't tracked.
+// for what is never written: not a deal, a deal with no end date (nothing tells when it stops,
+// and aggregators keep ended deals for years), or an aggregator's promo for a brand that isn't
+// tracked.
 func (r *parseRun) promo(pp models.ParsedPromo, it models.RawItem, src models.Source, brand models.Brand) (p models.Promo, ok bool) {
-	if !pp.IsDeal {
+	if !pp.IsDeal || pp.ValidUntil == "" {
 		return p, false
 	}
 	if src.IsAggregator {

@@ -186,6 +186,39 @@ func TestParseHiddenRules(t *testing.T) {
 	}
 }
 
+func TestParseDropsUndatedPromos(t *testing.T) {
+	f := newParseFixture()
+	it := item("src_miecontoh_katalog", "1001")
+	f.stored["new"] = []models.RawItem{it}
+	undated := deal("Undated", "Diskon 10%", 0.9)
+	undated.ValidFrom, undated.ValidUntil = "", ""
+	noEnd := deal("No end", "Diskon 20% tiap Kamis", 0.9)
+	noEnd.ValidUntil = ""
+	dated := deal("Dated", "Diskon 30%", 0.9)
+	f.parser.byItem[it.ID] = models.ParseResult{Promos: []models.ParsedPromo{undated, noEnd, dated}}
+
+	res, err := f.run(t)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(f.promos.got) != 1 || f.promos.got[0].Title != "Dated" {
+		t.Fatalf("only the promo with an end date is written: %+v", f.promos.got)
+	}
+	if res.Parse.Dropped != 2 || res.Parse.Promos != 1 {
+		t.Fatalf("summary: %+v", res.Parse)
+	}
+
+	f = newParseFixture()
+	f.stored["new"] = []models.RawItem{it}
+	f.parser.byItem[it.ID] = models.ParseResult{Promos: []models.ParsedPromo{undated}}
+	if _, err = f.run(t); err != nil {
+		t.Fatal(err)
+	}
+	if st := f.status(it.ID); st.Status != "skipped" || len(f.promos.got) != 0 {
+		t.Fatalf("an item with only undated promos is skipped, not parsed again: %+v", st)
+	}
+}
+
 func TestParseAggregatorResolvesBrands(t *testing.T) {
 	f := newParseFixture()
 	it := item("src_bank", "abc")
