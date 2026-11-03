@@ -5,6 +5,12 @@ on:
     - cron: "0 20 1,15 * *"   # 20:00 UTC = 03:00 WIB on the 2nd and 16th
   workflow_dispatch:
 
+# Shared with promos_daily, which starts at the same time: the two queue instead of writing the
+# sheet at once.
+concurrency:
+  group: sheet-writes
+  cancel-in-progress: false
+
 jobs:
   places:
     runs-on: ubuntu-latest

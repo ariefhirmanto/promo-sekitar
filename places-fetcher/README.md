@@ -123,8 +123,10 @@ go run ./app/promos -dry-run                                 # every due source,
 `-dry-run` logs the status writes and writes `raw_items.csv` and `promos.csv` (`-csv`,
 `-promos-csv`). With `-sources-file`, brands come from `-brands-file` and outlets from
 `-outlets-file` (none: every promo limited to a place is saved hidden); stored items aren't read.
-The workflow `promos_daily` runs it at 06:00 WIB once its schedule is uncommented; until then,
-Actions → promos_daily → Run workflow runs it by hand (dry run by default).
+The workflow `promos_daily` runs it at 03:00 WIB every day and writes the sheet. Actions →
+promos_daily → Run workflow runs it by hand (dry run by default, or one source). It shares the
+`sheet-writes` concurrency group with `places_refresh`, which starts at the same time on the 2nd
+and 16th: one waits for the other.
 
 ### The `web_page` source type
 

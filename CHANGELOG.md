@@ -42,6 +42,18 @@ Added
 Deploy: paste `apps-script/Code.gs` into Apps Script and deploy a new version, then merge so
 Vercel deploys the web app (in that order: the dropdown only appears once the feed sends
 `brands`). Roll back: `git revert` this commit and deploy `Code.gs` again.
+### promos_daily runs every day at 03:00 WIB
+
+Changed
+- `.github/workflows/promos_daily.yml`: the schedule is on, `0 20 * * *` (20:00 UTC = 03:00 WIB)
+  instead of the commented-out 06:00 WIB. Scheduled runs write the sheet; manual runs stay dry
+  runs by default.
+- `promos_daily` and `places_refresh` share the `sheet-writes` concurrency group: on the 2nd and
+  16th both start at 03:00 WIB, and GitHub now runs one after the other instead of both writing
+  the sheet at once.
+
+Deploy: merge to `main` (schedules only run from the default branch). Roll back: `git revert`
+this commit, or disable the workflow in Actions → promos_daily → ⋯ → Disable workflow.
 
 ### Fix: one slow Claude reply stopped the whole parse run
 
