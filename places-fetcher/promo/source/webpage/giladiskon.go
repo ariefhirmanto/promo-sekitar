@@ -2,9 +2,11 @@ package webpage
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/url"
 	"strings"
+	"time"
 
 	"places-fetcher/models"
 
@@ -60,9 +62,40 @@ func giladiskonDeal(page []byte) (it models.RawItem, err error) {
 	if h1 := findFirst(doc, byAtom(atom.H1)); h1 != nil {
 		title = text(h1, nil)
 	}
-	it.Text = joinText(title, text(body, nil))
+	words := text(body, nil)
+	// The end date sits outside .prose (a banner, and the Product data), and many deal texts don't
+	// repeat it: without it the parser can't tell a deal that ended last year from a current one.
+	if until := giladiskonValidUntil(doc); until != "" && words != "" {
+		words = "Berlaku sampai: " + until + "\n" + words
+	}
+	it.Text = joinText(title, words)
 	if it.Text == "" {
 		return it, fmt.Errorf("empty deal")
 	}
 	return it, nil
+}
+
+// giladiskonValidUntil returns the deal's offers.priceValidUntil (YYYY-MM-DD) from the page's
+// schema.org Product block, or "" when there is none.
+func giladiskonValidUntil(doc *html.Node) string {
+	for _, s := range findAll(doc, func(n *html.Node) bool {
+		return n.DataAtom == atom.Script && attr(n, "type") == "application/ld+json"
+	}) {
+		if s.FirstChild == nil {
+			continue
+		}
+		var ld struct {
+			Type   string `json:"@type"`
+			Offers struct {
+				PriceValidUntil string `json:"priceValidUntil"`
+			} `json:"offers"`
+		}
+		if json.Unmarshal([]byte(s.FirstChild.Data), &ld) != nil || ld.Type != "Product" {
+			continue
+		}
+		if _, err := time.Parse(time.DateOnly, ld.Offers.PriceValidUntil); err == nil {
+			return ld.Offers.PriceValidUntil
+		}
+	}
+	return ""
 }
