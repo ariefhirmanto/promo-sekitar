@@ -137,7 +137,7 @@ mode=raw_item_refs`) get their own page opened, at most `WebPage.MaxNewItems` (2
 | Host | `target` | One item, `ref` | Text |
 |---|---|---|---|
 | katalogpromosi.com | `/restoran-dan-cafe/<slug>/` | a post in `category-<slug>`, post id | title + `entry-content`, without share buttons, related posts and banners; `posted_at` from `article:published_time` |
-| giladiskon.com | `/merchant/<slug>` | a deal in `#deal-feed`, deal slug | title + the deal page's `.prose`; no `posted_at` (the page has none) |
+| giladiskon.com | `/merchant/<slug>` | a deal in `#deal-feed`, deal slug | title + `Berlaku sampai:` from the Product data's `priceValidUntil` + the deal page's `.prose`; no `posted_at` (the page has none) |
 | promo.bca.co.id | `/id/all/c/<category>` | a card in the Next.js payload, `idPromo` | `Brand:`, `Promo:`, `Periode:` from the card's dates + the card page's terms; `posted_at` = `publishDate` |
 | qpon.id | — | — | fails: needs headless rendering (not built); keep the source paused |
 | any other | the page | the page, hash of its text | title + `<main>` or `<article>` text |

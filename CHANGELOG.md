@@ -42,6 +42,23 @@ Deploy: merge to `main`; the next `promos_daily` run uses it. Undated `web` rows
 `promos` stay until the feed's 30-day rule drops them, or delete them by hand (filter `source` =
 `web` and `valid_until` empty; leave `manual` rows). Roll back: `git revert` this commit.
 
+### Fix: ended Gila Diskon deals showed as current
+
+Gila Diskon keeps old deals on a merchant page ("Promo ini sudah berakhir pada …"), but the end
+date sits outside the deal text the rule read. A deal whose text has no dates was parsed without
+`valid_until`, got the run date as `posted_at` (the page has none), and the feed kept it 30 days.
+
+Fixed
+- The giladiskon.com rule adds `Berlaku sampai: YYYY-MM-DD` under the title, from the page's
+  schema.org Product `offers.priceValidUntil`, so the parser sets `valid_until` and the feed drops
+  ended deals.
+
+Deploy: merge to `main`; the next `promos_daily` run uses it for new deals. Deals already in
+`raw_items` aren't fetched again, so their promos keep the old dates until their `raw_items` rows
+(source id `*_giladiskon`) and promos rows (`action_url` on giladiskon.com) are deleted and the
+next run reads and parses them again (about 50 items, a few cents). Roll back: `git revert` this
+commit.
+
 ### App: pick a brand
 
 Added
@@ -55,6 +72,7 @@ Added
 Deploy: paste `apps-script/Code.gs` into Apps Script and deploy a new version, then merge so
 Vercel deploys the web app (in that order: the dropdown only appears once the feed sends
 `brands`). Roll back: `git revert` this commit and deploy `Code.gs` again.
+
 ### promos_daily runs every day at 03:00 WIB
 
 Changed
