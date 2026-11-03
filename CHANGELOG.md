@@ -29,6 +29,20 @@ A change can live in three places; roll back each one the change touched.
 
 ## Unreleased
 
+### App: pick a brand
+
+Added
+- `Code.gs` feed: optional `brand=brand_x` keeps only that brand's promos (swipe and nearby,
+  still nearest outlet first), and every feed answer lists `brands`: each brand with a current
+  promo and its count. Without `brand` the feed answers as before, plus that list.
+- Web: a brand dropdown above the deck ("Semua brand" or one brand, with counts). Picking one
+  restarts the deck for the same location; `/api/feed` checks and passes `brand`, and caches per
+  brand.
+
+Deploy: paste `apps-script/Code.gs` into Apps Script and deploy a new version, then merge so
+Vercel deploys the web app (in that order: the dropdown only appears once the feed sends
+`brands`). Roll back: `git revert` this commit and deploy `Code.gs` again.
+
 ### Fix: one slow Claude reply stopped the whole parse run
 
 Found in the first parse dry run against the sheet (`context deadline exceeded`).

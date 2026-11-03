@@ -5,7 +5,12 @@ const parse = (qs: string) => parseFeedQuery(new URLSearchParams(qs));
 
 describe("parseFeedQuery", () => {
   it("defaults to the first swipe page without location", () => {
-    expect(parse("")).toEqual({ ok: true, query: { mode: "swipe", cells: "", offset: 0, limit: 10 } });
+    expect(parse("")).toEqual({ ok: true, query: { mode: "swipe", cells: "", offset: 0, limit: 10, brand: "" } });
+  });
+
+  it("passes a brand id through, and an empty brand means every brand", () => {
+    expect(parse("brand=brand_hokben").ok && parse("brand=brand_hokben")).toMatchObject({ query: { brand: "brand_hokben" } });
+    expect(parse("brand=").ok && parse("brand=")).toMatchObject({ query: { brand: "" } });
   });
 
   it("puts cells in a fixed order so one area is one cache entry", () => {
@@ -24,6 +29,9 @@ describe("parseFeedQuery", () => {
     ["offset=abc", "offset"],
     [`limit=${MAX_LIMIT + 1}`, "limit"],
     ["limit=0", "limit"],
+    ["brand=hokben", "brand"],
+    ["brand=brand_Hok%20Ben", "brand"],
+    [`brand=brand_${"x".repeat(61)}`, "brand"],
   ])("rejects %s", (qs, word) => {
     const r = parse(qs);
     expect(r.ok).toBe(false);

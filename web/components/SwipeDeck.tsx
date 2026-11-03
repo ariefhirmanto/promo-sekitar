@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { distanceM, formatDistance, ringCells, walkLabel } from "@/lib/h3cells";
 import { directionsUrl } from "@/lib/maps";
 import { channelLabel, promoStatus, todayJakarta } from "@/lib/promoStatus";
-import type { FeedError, FeedItem, FeedResponse } from "@/lib/types";
+import type { FeedBrand, FeedError, FeedItem, FeedResponse } from "@/lib/types";
 import styles from "./SwipeDeck.module.css";
 
 type Position = { lat: number; lng: number };
@@ -25,6 +25,9 @@ export default function SwipeDeck() {
   const [note, setNote] = useState("");
   const [today, setToday] = useState(""); // set when a page loads; render may not read the clock
   const [dx, setDx] = useState(0);
+  const [brands, setBrands] = useState<FeedBrand[]>([]);
+  const [brand, setBrand] = useState(""); // brand_* id; "" = every brand
+  const brandRef = useRef(""); // loadPage reads the pick from here, so locate's callbacks see it
   const dragFrom = useRef<number | null>(null);
   const dragged = useRef(false);
 
@@ -32,9 +35,11 @@ export default function SwipeDeck() {
     setPhase("loading");
     try {
       const qs = new URLSearchParams({ mode: "swipe", cells: forCells, offset: String(offset), limit: String(PAGE) });
+      if (brandRef.current) qs.set("brand", brandRef.current);
       const res = await fetch(`/api/feed?${qs}`);
       const data = (await res.json()) as FeedResponse | FeedError;
       if (!data.ok) throw new Error(data.error);
+      if (data.brands) setBrands(data.brands);
       setToday(todayJakarta());
       setItems(data.items);
       setIdx(0);
@@ -79,6 +84,14 @@ export default function SwipeDeck() {
   }, [locate]);
 
   const card = items.at(idx);
+  const brandName = brands.find((b) => b.id === brand)?.name ?? "brand ini";
+
+  // A new pick starts the deck over for the same location, nearest outlets first as before.
+  const pickBrand = (id: string) => {
+    brandRef.current = id;
+    setBrand(id);
+    void loadPage(cells, 0);
+  };
 
   const vote = (want: boolean) => {
     if (!card) return;
@@ -94,6 +107,23 @@ export default function SwipeDeck() {
       <p className={styles.lede}>
         Geser ke kanan atau ketuk “Mau” untuk membuka promonya. Geser ke kiri untuk lewat.
       </p>
+      {brands.length > 0 && (
+        <label className={styles.picker}>
+          <span>Brand</span>
+          <select
+            value={brand}
+            onChange={(e) => pickBrand(e.target.value)}
+            disabled={phase === "locating" || phase === "loading"}
+          >
+            <option value="">Semua brand</option>
+            {brands.map((b) => (
+              <option key={b.id} value={b.id}>
+                {b.name} ({b.count})
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
       {note && (
         <p className={styles.note}>
           {note}{" "}
@@ -112,14 +142,19 @@ export default function SwipeDeck() {
           <button className={styles.link} onClick={() => void loadPage(cells, 0)}>Coba lagi</button>
         </div>
       )}
-      {phase === "empty" && (
+      {phase === "empty" && (brand ? (
+        <div className={styles.state}>
+          <p>Belum ada promo {brandName} saat ini.</p>
+          <button className={styles.link} onClick={() => pickBrand("")}>Lihat semua brand</button>
+        </div>
+      ) : (
         <div className={styles.state}>
           <p>Belum ada promo di sekitar sini.</p>
           {pos && rings < 4 && (
             <button className={styles.link} onClick={() => locate(4)}>Perluas area</button>
           )}
         </div>
-      )}
+      ))}
 
       {phase === "ready" && card && (
         <>

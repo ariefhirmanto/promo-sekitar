@@ -286,3 +286,36 @@ test('the feed drops expired promos, and undated ones posted more than 30 days a
   const ids = s.ctx.loadData_().promos.map((p) => p.id);
   assert.deepEqual(ids, ['promo_current', 'promo_undated_new', 'promo_undated_no_post']);
 });
+
+test('the feed filters by brand and lists brands with current promos', () => {
+  const cell = '88658c1a9bfffff';
+  const row = (id, brandId, until) => [id, brandId, '', id, 'Cek syarat', 'dine_in', '', until, iso(DAY).slice(0, 10), '', 'active', 'https://example.com/', 'web'];
+  const s = loadCode(tabs({
+    brands: [['id', 'name', 'aliases'], ['brand_ramenya', 'Ramen Ya', ''], ['brand_miecontoh', 'Mie Contoh', ''], ['brand_kopi', 'Kopi Contoh', '']],
+    outlets: [['id', 'brand_id', 'name', 'status', 'h3_r8'],
+      ['out_osm_n1', 'brand_ramenya', 'RamenYa Margo', 'open', cell],
+      ['out_osm_n2', 'brand_miecontoh', 'Mie Contoh Margo', 'open', cell]],
+    promos: [PROMO_HEADER,
+      row('promo_mie_1', 'brand_miecontoh', ''),
+      row('promo_mie_2', 'brand_miecontoh', ''),
+      row('promo_ramen_1', 'brand_ramenya', ''),
+      row('promo_kopi_old', 'brand_kopi', iso(2 * DAY).slice(0, 10)), // expired: no promo, not listed
+      row('promo_unknown', '', '')],                                  // no brand id: not listed
+  }));
+  const brands = [{ id: 'brand_miecontoh', name: 'Mie Contoh', count: 2 }, { id: 'brand_ramenya', name: 'Ramen Ya', count: 1 }];
+
+  const all = s.get({ mode: 'swipe', token: 'r' });
+  assert.equal(all.total, 4);
+  assert.deepEqual(all.brands, brands);
+
+  const mie = s.get({ mode: 'swipe', token: 'r', brand: 'brand_miecontoh', cells: '0:' + cell });
+  assert.equal(mie.total, 2);
+  assert.deepEqual(mie.items.map((i) => i.promo_id).sort(), ['promo_mie_1', 'promo_mie_2']);
+  assert.equal(mie.items[0].outlet.id, 'out_osm_n2', 'nearest outlet still found');
+  assert.deepEqual(mie.brands, brands, 'the list is not filtered by the picked brand');
+
+  const near = s.get({ mode: 'nearby', token: 'r', brand: 'brand_ramenya', cells: '0:' + cell });
+  assert.deepEqual(near.items.map((i) => i.outlet.id), ['out_osm_n1']);
+
+  assert.equal(s.get({ mode: 'swipe', token: 'r', brand: 'brand_nope' }).total, 0);
+});

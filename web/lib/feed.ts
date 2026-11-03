@@ -6,7 +6,7 @@ import type { FeedQuery, FeedResponse } from "./types";
 // getFeed calls the Apps Script web app with READ_TOKEN. It runs only on the server: the build
 // fails if a client component imports this file, so the token can't reach the browser.
 //
-// Cached per query (mode, cells, offset, limit) for up to 5 minutes, the same window as Code.gs,
+// Cached per query (mode, cells, offset, limit, brand) for up to 5 minutes, the same window as Code.gs,
 // so a busy area costs one Apps Script call per 5 minutes, not one per swipe.
 export async function getFeed(query: FeedQuery): Promise<FeedResponse> {
   "use cache";
@@ -26,6 +26,7 @@ export async function getFeed(query: FeedQuery): Promise<FeedResponse> {
   url.searchParams.set("cells", query.cells);
   url.searchParams.set("offset", String(query.offset));
   url.searchParams.set("limit", String(query.limit));
+  if (query.brand) url.searchParams.set("brand", query.brand);
 
   // Apps Script answers with a redirect to the result; fetch follows it.
   const res = await fetch(url, { signal: AbortSignal.timeout(15_000) });
