@@ -6,6 +6,8 @@
  *
  *   GET {WEB_APP_URL}?token=READ&mode=swipe&cells=0:88658c1a9bfffff,1:88658c1a9dfffff&offset=0&limit=10
  *   GET {WEB_APP_URL}?token=READ&mode=nearby&cells=...
+ *   Both take an optional &brand=brand_x (only that brand's promos) and return `brands`: every brand
+ *   with a current promo, for the app's brand picker.
  *   GET {WEB_APP_URL}?token=WRITE&mode=brands                (places fetcher reads its brand list)
  *   POST {WEB_APP_URL}?token=WRITE&mode=upsert_outlets       (places fetcher writes the outlets tab)
  *
@@ -66,13 +68,16 @@ function doGet(e) {
   const ringOf = parseCells_(p.cells);
   const offset = Math.max(0, parseInt(p.offset, 10) || 0);
   const limit = Math.min(MAX_LIMIT, Math.max(1, parseInt(p.limit, 10) || 10));
+  const brand = String(p.brand || '').trim();
 
   try {
     const data = loadData_();
+    const brands = brandsWithPromos_(data);
+    const view = brand ? onlyBrand_(data, brand) : data;
     const result = mode === 'nearby'
-      ? nearby_(data, ringOf)
-      : swipe_(data, ringOf, offset, limit);
-    return json_(Object.assign({ ok: true, mode: mode }, result));
+      ? nearby_(view, ringOf)
+      : swipe_(view, ringOf, offset, limit);
+    return json_(Object.assign({ ok: true, mode: mode, brands: brands }, result));
   } catch (err) {
     return json_({ ok: false, error: String(err && err.message || err) });
   }
@@ -507,6 +512,24 @@ function nearby_(data, ringOf) {
 }
 
 /* ---------- helpers ---------- */
+
+// The brand picker: brands in the brands tab with at least one current promo, by name.
+function brandsWithPromos_(data) {
+  const count = {};
+  data.promos.forEach(function (pr) {
+    if (data.brandsById[pr.brand_id]) count[pr.brand_id] = (count[pr.brand_id] || 0) + 1;
+  });
+  return Object.keys(count)
+    .map(function (id) { return { id: id, name: String(data.brandsById[id].name), count: count[id] }; })
+    .sort(function (a, b) { return a.name.localeCompare(b.name); });
+}
+
+// The same data with only one brand's promos; outlets stay, so ranking and distances still work.
+function onlyBrand_(data, brandId) {
+  return Object.assign({}, data, {
+    promos: data.promos.filter(function (pr) { return pr.brand_id === brandId; })
+  });
+}
 
 function nearestOutlet_(data, promo, ringOf) {
   let best = null;

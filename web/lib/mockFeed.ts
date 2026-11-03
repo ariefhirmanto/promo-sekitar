@@ -1,4 +1,4 @@
-import type { FeedItem, FeedQuery, FeedResponse } from "./types";
+import type { FeedBrand, FeedItem, FeedQuery, FeedResponse } from "./types";
 
 // Sample promos for FEED_MOCK=1, taken from the hand-entered rows of the sheet, so the UI can be
 // built without Apps Script. The outlet is the sheet's example row (approximate location).
@@ -61,13 +61,27 @@ export const MOCK_ITEMS: FeedItem[] = [
   },
 ];
 
+// Feed items carry the brand's name only; the mock knows the ids of its two brands.
+const MOCK_BRAND_IDS: Record<string, string> = { HokBen: "brand_hokben", "Marugame Udon": "brand_marugame" };
+
+// The brand picker list, like Code.gs: brands with promos, by name.
+function mockBrands(): FeedBrand[] {
+  const count = new Map<string, number>();
+  for (const i of MOCK_ITEMS) count.set(i.brand, (count.get(i.brand) ?? 0) + 1);
+  return [...count]
+    .map(([name, n]) => ({ id: MOCK_BRAND_IDS[name], name, count: n }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
 // mockFeed pages through MOCK_ITEMS like Code.gs: the deck wraps to 0 after the last page.
 export function mockFeed(q: FeedQuery): FeedResponse {
+  const brands = mockBrands();
+  const pool = q.brand ? MOCK_ITEMS.filter((i) => MOCK_BRAND_IDS[i.brand] === q.brand) : MOCK_ITEMS;
   if (q.mode === "nearby") {
-    if (!q.cells) return { ok: true, mode: "nearby", items: [], needs_location: true };
-    return { ok: true, mode: "nearby", items: MOCK_ITEMS.filter((i) => i.outlet) };
+    if (!q.cells) return { ok: true, mode: "nearby", items: [], needs_location: true, brands };
+    return { ok: true, mode: "nearby", items: pool.filter((i) => i.outlet), brands };
   }
-  const items = MOCK_ITEMS.slice(q.offset, q.offset + q.limit);
-  const next = q.offset + q.limit < MOCK_ITEMS.length ? q.offset + q.limit : 0;
-  return { ok: true, mode: "swipe", total: MOCK_ITEMS.length, next_offset: next, items };
+  const items = pool.slice(q.offset, q.offset + q.limit);
+  const next = q.offset + q.limit < pool.length ? q.offset + q.limit : 0;
+  return { ok: true, mode: "swipe", total: pool.length, next_offset: next, items, brands };
 }

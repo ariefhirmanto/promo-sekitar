@@ -25,10 +25,18 @@ export type FeedItem = {
   other_promos?: number; // nearby mode: more promos at the same outlet
 };
 
+// A brand with at least one current promo, for the brand picker.
+export type FeedBrand = {
+  id: string; // brand_*
+  name: string;
+  count: number;
+};
+
 export type FeedResponse = {
   ok: true;
   mode: FeedMode;
   items: FeedItem[];
+  brands?: FeedBrand[]; // every brand with promos, whatever brand was asked for
   total?: number; // swipe
   next_offset?: number; // swipe: 0 means the deck wrapped around
   needs_location?: boolean; // nearby without cells
@@ -41,4 +49,5 @@ export type FeedQuery = {
   cells: string; // "ring:cell,…", canonical order; "" without location
   offset: number;
   limit: number;
+  brand: string; // brand_* id; "" = every brand
 };

@@ -17,6 +17,32 @@
   margin: 0 0 16px;
 }
 
+.picker {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 14px;
+  font-weight: 600;
+}
+
+.picker select {
+  flex: 1;
+  min-width: 0;
+  font: inherit;
+  font-weight: 600;
+  color: var(--ink);
+  background: var(--card);
+  border: 2px solid var(--line);
+  border-radius: 12px;
+  padding: 10px 12px;
+  cursor: pointer;
+}
+
+.picker select:disabled {
+  cursor: progress;
+  opacity: 0.7;
+}
+
 .note {
   font-size: 0.9rem;
   color: var(--muted);

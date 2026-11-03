@@ -3,6 +3,7 @@ import type { FeedQuery } from "./types";
 export const MAX_LIMIT = 50; // same cap as Code.gs
 export const MAX_CELLS = 127; // gridDisk k = 6; the app asks for k = 2, or 4 when widened
 const CELL = /^(\d{1,2}):([0-9a-f]{15})$/;
+const BRAND = /^brand_[a-z0-9_]{1,60}$/; // the brands tab's ids
 
 export type ParsedQuery =
   | { ok: true; query: FeedQuery }
@@ -38,7 +39,12 @@ export function parseFeedQuery(params: URLSearchParams): ParsedQuery {
     return { ok: false, error: `limit must be 1 to ${MAX_LIMIT}` };
   }
 
-  return { ok: true, query: { mode, cells: cells.join(","), offset, limit } };
+  const brand = (params.get("brand") ?? "").trim();
+  if (brand !== "" && !BRAND.test(brand)) {
+    return { ok: false, error: `bad brand: ${brand.slice(0, 40)}` };
+  }
+
+  return { ok: true, query: { mode, cells: cells.join(","), offset, limit, brand } };
 }
 
 function intParam(raw: string | null, fallback: number): number | null {
