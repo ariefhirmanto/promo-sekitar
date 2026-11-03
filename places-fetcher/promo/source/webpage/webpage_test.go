@@ -106,7 +106,7 @@ func TestGiladiskonSkipsAFailedDealPage(t *testing.T) {
 	if it.Ref != "paket-hemat-berdua" || it.URL != "https://www.giladiskon.com/deals/paket-hemat-berdua" {
 		t.Fatalf("ref and url: %+v", it)
 	}
-	want := "Paket Hemat Berdua Rp40.000\nSenin–Jumat, 1 sampai 30 November 2026, di semua outlet.\nSyarat:\n- Makan di tempat.\n- Tidak bisa digabung."
+	want := "Paket Hemat Berdua Rp40.000\nBerlaku sampai: 2026-11-30\nSenin–Jumat, 1 sampai 30 November 2026, di semua outlet.\nSyarat:\n- Makan di tempat.\n- Tidak bisa digabung."
 	if it.Text != want {
 		t.Fatalf("text:\n%s\nwant:\n%s", it.Text, want)
 	}
