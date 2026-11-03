@@ -29,6 +29,19 @@ A change can live in three places; roll back each one the change touched.
 
 ## Unreleased
 
+### Promos without an end date are dropped
+
+Changed
+- The promo fetcher no longer writes a promo whose `valid_until` is empty: aggregators keep ended
+  deals for years, and an undated one looked current (Gila Diskon pages have no post date, so it
+  got the run date and the feed kept it 30 days). An item whose promos are all undated is
+  `skipped`, so it isn't parsed again. Standing or weekly offers with no end date go too; add one
+  by hand (`source = manual`) to show it.
+
+Deploy: merge to `main`; the next `promos_daily` run uses it. Undated `web` rows already in
+`promos` stay until the feed's 30-day rule drops them, or delete them by hand (filter `source` =
+`web` and `valid_until` empty; leave `manual` rows). Roll back: `git revert` this commit.
+
 ### App: pick a brand
 
 Added
